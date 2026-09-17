@@ -25,6 +25,13 @@ if (!headers_sent()) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="<?= \App\Shared\Http\Url::to('manifest.webmanifest') ?>">
+    <link rel="icon" type="image/png" sizes="32x32" href="<?= \App\Shared\Http\Assets::url('images/favicon-32.png') ?>">
+    <link rel="icon" type="image/png" sizes="16x16" href="<?= \App\Shared\Http\Assets::url('images/favicon-16.png') ?>">
+    <link rel="apple-touch-icon" sizes="180x180" href="<?= \App\Shared\Http\Assets::url('images/apple-touch-icon.png') ?>">
     <?php include SGI_ROOT . '/resources/views/components/page-title.php'; ?>
     <!-- Bootstrap tematizado e folha compartilhada -->
     <link href="<?= \App\Shared\Http\Assets::url('css/bootstrap-theme.css') ?>" rel="stylesheet">
