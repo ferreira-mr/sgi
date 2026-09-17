@@ -268,7 +268,7 @@
 /* --- Timer Typography: size and tabular digits are domain-specific. --- */
 .mc-timer-time{font-size:3.5rem;font-variant-numeric:tabular-nums}
 /* --- Score Typography --- */
-.mc-score{font-size:6.5rem;min-width:5rem;font-variant-numeric:tabular-nums}
+.mc-score{font-size:6.5rem;min-width:2.5rem;font-variant-numeric:tabular-nums;white-space:nowrap}
 
 /* --- Score Buttons: touch target and icon size are domain-specific. --- */
 .btn-score{width:56px;height:56px;font-size:1.5rem}
@@ -689,12 +689,13 @@
 
     .sgi-placar [class~="mc-score-row"] {
         gap: .375rem !important;
-        flex-wrap: wrap;
+        flex-wrap: nowrap !important;
     }
 
     .sgi-placar .mc-score {
         font-size: clamp(2.75rem, 8vw, 4rem);
-        min-width: 3.25rem;
+        min-width: 2.25rem;
+        white-space: nowrap !important;
     }
 
     .sgi-placar .btn-score {

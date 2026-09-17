@@ -307,6 +307,11 @@ window.SGIPage.mount("aluno/jogos", function (pageConfig, pageScope) {
             `;
 
             const dot = status.dot ? '<i class="bi bi-circle-fill me-1" aria-hidden="true"></i>' : '';
+            const showTagA = eqA.tag && eqA.tag.trim().toLowerCase() !== (eqA.nome || '').trim().toLowerCase();
+            const showTagB = eqB.tag && eqB.tag.trim().toLowerCase() !== (eqB.nome || '').trim().toLowerCase();
+            const scoreDisplay = isFinalizado
+                ? `<div class="d-flex align-items-center justify-content-center gap-2 bg-body-tertiary border rounded-3 px-3 py-2 fs-4 fw-bold flex-shrink-0 text-nowrap"><span class="text-primary">${esc(placarA)}</span><span class="text-body-secondary small">:</span><span class="text-primary">${esc(placarB)}</span></div>`
+                : `<div class="d-flex align-items-center justify-content-center bg-body-tertiary border rounded-3 px-3 py-2 flex-shrink-0"><span class="sgi-vs-badge">VS</span></div>`;
 
             return `
                 <div class="col">
@@ -325,18 +330,14 @@ window.SGIPage.mount("aluno/jogos", function (pageConfig, pageScope) {
 
                     <div class="d-flex align-items-center justify-content-between gap-2 mt-3">
                         <div class="d-flex flex-column align-items-center flex-grow-1 text-center gap-1">
-                            <span class="badge text-bg-primary text-uppercase">${esc(eqA.tag)}</span>
+                            ${showTagA ? `<span class="badge text-bg-primary text-uppercase">${esc(eqA.tag)}</span>` : ''}
                             <span class="fw-semibold text-truncate w-100">${esc(eqA.nome)}</span>
                         </div>
 
-                        <div class="d-flex align-items-baseline justify-content-center gap-2 bg-body-tertiary border rounded-3 px-3 py-2 fs-3 fw-bold flex-shrink-0">
-                            <span class="${isFinalizado ? 'text-primary' : 'text-body-tertiary'}">${esc(placarA)}</span>
-                            <span class="small text-body-secondary">x</span>
-                            <span class="${isFinalizado ? 'text-primary' : 'text-body-tertiary'}">${esc(placarB)}</span>
-                        </div>
+                        ${scoreDisplay}
 
                         <div class="d-flex flex-column align-items-center flex-grow-1 text-center gap-1">
-                            <span class="badge text-bg-primary text-uppercase">${esc(eqB.tag)}</span>
+                            ${showTagB ? `<span class="badge text-bg-primary text-uppercase">${esc(eqB.tag)}</span>` : ''}
                             <span class="fw-semibold text-truncate w-100">${esc(eqB.nome)}</span>
                         </div>
                     </div>

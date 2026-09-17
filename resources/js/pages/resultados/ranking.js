@@ -208,6 +208,7 @@ window.SGIPage.mount("resultados/ranking", function (pageConfig, pageScope) {
             ? dadosAPI.filter(t => t.nome_categoria === categoria)
             : dadosAPI;
         document.getElementById('totalTurmas').innerText = `${turmasFiltradas.length} Turmas`;
+        document.getElementById('totalTurmas').innerText = `${turmasFiltradas.length} Turmas`;
         const ttd = document.getElementById('totalTurmasDesk');
         if (ttd) ttd.innerText = `${turmasFiltradas.length} Turmas`;
         renderizarRanking(turmasFiltradas);
@@ -227,7 +228,6 @@ window.SGIPage.mount("resultados/ranking", function (pageConfig, pageScope) {
         }
 
         const maxPontos = Math.max(...turmas.map(t => t.pontuacao_bruta ?? t.pontuacao_sem_penalidade ?? t.pontuacao_turma)) || 1;
-        const medals = ['&#x1F947;', '&#x1F948;', '&#x1F949;'];
         let htmlRanking = '';
 
         turmas.forEach((t, index) => {
@@ -245,17 +245,31 @@ window.SGIPage.mount("resultados/ranking", function (pageConfig, pageScope) {
                     : posicao === 3
                         ? 'border-danger-subtle border-2 bg-danger-subtle'
                         : 'border-light';
-            const posicaoClasses = isTop3 ? 'bg-dark text-white' : 'bg-body-secondary text-body-secondary';
+            const badgeClass = posicao === 1
+                ? 'sgi-podium-badge--1'
+                : posicao === 2
+                    ? 'sgi-podium-badge--2'
+                    : posicao === 3
+                        ? 'sgi-podium-badge--3'
+                        : 'sgi-podium-badge--default';
+            const podiumPill = posicao === 1
+                ? '<span class="badge bg-warning text-dark fw-bold text-uppercase px-2 py-1"><i class="bi bi-trophy-fill me-1" aria-hidden="true"></i>1º Lugar</span>'
+                : posicao === 2
+                    ? '<span class="badge bg-secondary-subtle text-secondary-emphasis fw-bold text-uppercase px-2 py-1"><i class="bi bi-award-fill me-1" aria-hidden="true"></i>2º Lugar</span>'
+                    : posicao === 3
+                        ? '<span class="badge bg-danger-subtle text-danger-emphasis fw-bold text-uppercase px-2 py-1"><i class="bi bi-award-fill me-1" aria-hidden="true"></i>3º Lugar</span>'
+                        : '';
 
             const html = `
                 <div class="mb-3" data-sgi-index="${index}">
                     <div class="card position-relative ${destaqueClasses} card-turma p-3 p-md-4">
-                        ${isTop3 ? `<span class="position-absolute top-0 end-0 translate-middle fs-3" aria-hidden="true">${medals[posicao - 1]}</span>` : ''}
-
                         <div class="d-flex align-items-center gap-3">
-                            <div class="d-flex align-items-center justify-content-center rounded-circle ${posicaoClasses} flex-shrink-0" style="width: 2.75rem; height: 2.75rem;">${posicao}°</div>
+                            <div class="sgi-podium-badge ${badgeClass} flex-shrink-0" aria-label="${posicao}º lugar">${posicao}°</div>
                             <div class="flex-grow-1 sgi-u-min-width-0">
-                                <div class="h5 fw-semibold mb-1 text-truncate">${esc(t.nome_turma)}</div>
+                                <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                                    <span class="h5 fw-semibold mb-0 text-truncate">${esc(t.nome_turma)}</span>
+                                    ${podiumPill}
+                                </div>
                                 <div class="small text-body-secondary"><i class="bi bi-mortarboard-fill me-1"></i>${esc(t.nome_fantasia_turma || t.turno_turma)}</div>
                             </div>
                             <div class="badge text-bg-primary fs-6 flex-shrink-0"><span>${ptsLiquidos}</span> <small>pts</small></div>

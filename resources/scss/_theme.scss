@@ -1,3 +1,27 @@
 $primary: #e30613;
 $font-family-sans-serif: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
-$body-bg: #f8f9fa;
+$body-bg: #f8fafc;
+$body-color: #0f172a;
+
+// Bordas e raios modernos
+$border-radius: 0.625rem;
+$border-radius-sm: 0.375rem;
+$border-radius-lg: 0.875rem;
+$border-radius-xl: 1.25rem;
+$border-radius-2xl: 1.5rem;
+
+// Sombras atmosféricas multi-camada
+$box-shadow-sm: (0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.05));
+$box-shadow: (0 2px 4px rgba(0, 0, 0, 0.04), 0 6px 16px rgba(0, 0, 0, 0.06));
+$box-shadow-lg: (0 4px 6px rgba(0, 0, 0, 0.04), 0 12px 32px rgba(0, 0, 0, 0.08));
+
+// Componentes
+$card-border-color: rgba(0, 0, 0, 0.07);
+$card-border-radius: 0.875rem;
+$modal-content-border-radius: 1.25rem;
+$modal-header-border-width: 0px;
+$input-focus-border-color: #e30613;
+$input-btn-focus-box-shadow: 0 0 0 0.2rem rgba(227, 6, 19, 0.18);
+$btn-border-radius: 0.625rem;
+$btn-border-radius-sm: 0.5rem;
+$btn-border-radius-lg: 0.75rem;

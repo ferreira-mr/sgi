@@ -12,7 +12,7 @@ $nivelUsuarioAgenda = (int)($_SESSION['nivel'] ?? -1);
 <main class="d-md-none ag-mobile sgi-agenda-mobile sgi-u-min-width-0 p-3">
     <h1 class="h4 fw-bold text-body mb-3">Agenda de Jogos</h1>
     <div class="card overflow-hidden">
-        <div class="bg-dark text-white d-flex align-items-center justify-content-between p-3">
+        <div class="bg-primary text-white d-flex align-items-center justify-content-between p-3">
             <button type="button" id="btn-prev-mobile" class="btn btn-sm btn-link link-light p-1" aria-label="Mês anterior"><i class="bi bi-chevron-left" aria-hidden="true"></i></button>
             <div class="d-flex gap-2 align-items-center">
                 <label class="visually-hidden" for="select-mes">Mês da agenda</label>
@@ -60,7 +60,7 @@ $nivelUsuarioAgenda = (int)($_SESSION['nivel'] ?? -1);
             <option value="Agendado">Agendados</option>
         </select>
         <?php if ($nivelUsuarioAgenda <= 1): ?>
-            <button type="button" class="btn btn-dark btn-sm w-100 d-inline-flex align-items-center justify-content-center gap-2 mt-1 btn-trigger-datas-auto">
+            <button type="button" class="btn btn-primary btn-sm w-100 d-inline-flex align-items-center justify-content-center gap-2 mt-1 btn-trigger-datas-auto">
                 <i class="bi bi-calendar2-plus"></i> Agendar automaticamente
             </button>
         <?php endif; ?>
@@ -117,7 +117,7 @@ $nivelUsuarioAgenda = (int)($_SESSION['nivel'] ?? -1);
                 <option value="Agendado">Agendados</option>
             </select>
             <?php if ($nivelUsuarioAgenda <= 1): ?>
-                <button type="button" class="btn btn-dark btn-sm d-inline-flex align-items-center gap-2 ms-auto btn-trigger-datas-auto">
+                <button type="button" class="btn btn-primary btn-sm d-inline-flex align-items-center gap-2 ms-auto btn-trigger-datas-auto">
                     <i class="bi bi-calendar2-plus"></i> Agendar automaticamente
                 </button>
             <?php endif; ?>
@@ -140,7 +140,7 @@ $nivelUsuarioAgenda = (int)($_SESSION['nivel'] ?? -1);
 
             <div class="col-12 col-xl-4 ag-cal-sticky">
                 <div class="card overflow-hidden">
-                    <div class="bg-dark text-white d-flex align-items-center justify-content-between p-3">
+                    <div class="bg-primary text-white d-flex align-items-center justify-content-between p-3">
                         <button type="button" id="btn-prev" class="btn btn-sm btn-link link-light p-1" aria-label="Mês anterior"><i class="bi bi-chevron-left"></i></button>
                         <span id="calendario-mes" class="small fw-bold text-uppercase"></span>
                         <button type="button" id="btn-next" class="btn btn-sm btn-link link-light p-1" aria-label="Próximo mês"><i class="bi bi-chevron-right"></i></button>

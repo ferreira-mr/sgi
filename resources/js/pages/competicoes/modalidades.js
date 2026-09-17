@@ -31,7 +31,7 @@ window.SGIPage.mount("competicoes/modalidades", function (pageConfig, pageScope)
             if (divDesktop) divDesktop.innerHTML = '';
 
             if (!Array.isArray(modalidades) || modalidades.length === 0) {
-                const msgVazia = '<p class="text-muted mt-4 text-center w-100">Nenhuma modalidade encontrada.</p>';
+                const msgVazia = '<div class="card border-0 bg-light-subtle rounded-4 p-5 text-center my-4 w-100">' + '<div class="mx-auto mb-3 text-secondary opacity-50"><i class="bi bi-trophy display-4"></i></div>' + '<h3 class="h6 fw-semibold text-secondary mb-1">Nenhuma modalidade encontrada</h3>' + '<p class="text-body-secondary small mb-0">Cadastre modalidades para esta edição para organizar os jogos.</p>' + '</div>';
                 if (divMobile) divMobile.innerHTML = msgVazia;
                 if (divDesktop) divDesktop.innerHTML = msgVazia;
                 return;

@@ -1107,9 +1107,9 @@ window.SGIPage.mount("competicoes/placar", function (pageConfig, pageScope) {
 
             html += '<div class="col-12 col-md-5 text-center" data-partida-idx="' + idx + '">';
             html += '<h3 class="mc-team-name h5 fw-bold text-body mb-3 text-truncate">' + esc(nomeEquipeAtual) + '</h3>';
-            html += '<div class="mc-score-row d-flex align-items-center justify-content-center gap-3">';
+            html += '<div class="mc-score-row d-flex flex-nowrap align-items-center justify-content-center gap-3">';
             html += btnMinus;
-            html += '<span class="mc-score score-number fw-bolder text-body lh-1 text-center" data-gols="' + idx + '">' + String(gols).padStart(2, '0') + '</span>';
+            html += '<span class="mc-score score-number fw-bolder text-body lh-1 text-center text-nowrap" data-gols="' + idx + '">' + String(gols) + '</span>';
             html += btnPlus;
             html += '</div></div>';
 

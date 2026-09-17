@@ -42,7 +42,7 @@ $isMesario = $nivelUsuario === 2;
         <?php endif; ?>
 
         <div>
-            <div class="row mt-4 bg-danger rounded-3 shadow text-white py-3 fs-5 fw-medium px-2">
+            <div class="row mt-4 bg-light border border-1 rounded-3 text-secondary py-3 fs-6 fw-semibold text-uppercase px-2 shadow-sm">
                 <div class="col-4">Edição interclasse</div>
                 <div class="col-4 text-center">Ano</div>
                 <div class="col-4 text-center">Status</div>
