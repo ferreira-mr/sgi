@@ -229,10 +229,10 @@ test.describe('Mesário — fluxo visual completo offline', () => {
         // vazia não pode alterar o placar.
         await page.locator('.btn-score-plus').first().click();
         await expect(page.locator('#modalArtilheiro')).toBeVisible();
-        await expect(page.locator('.score-number').first()).toHaveText('00');
+        await expect(page.locator('.score-number').first()).toHaveText('0');
         await page.locator('#btnSalvarArtilheiro').click();
         await expect(page.locator('#msgArtilheiro')).toContainText('Selecione o aluno responsável pela jogada', { timeout: 10_000 });
-        await expect(page.locator('.score-number').first()).toHaveText('00');
+        await expect(page.locator('.score-number').first()).toHaveText('0');
         await expect.poll(() => page.locator('#selectAlunoArtilheiro option').count()).toBeGreaterThan(1);
         await selecionarAtletaE2EOffline(page, fixture.nomeAtleta);
         await page.locator('#btnSalvarArtilheiro').click();
@@ -240,7 +240,7 @@ test.describe('Mesário — fluxo visual completo offline', () => {
         await expect(page.locator('#placar-status-announcer')).toContainText(/ponto salvo neste dispositivo.*aguardando/i);
         await expect(page.locator('#mc-sync-status')).toBeHidden();
         await expect(page.locator('#modalArtilheiro')).toBeHidden({ timeout: 10_000 });
-        await expect(page.locator('.score-number').first()).toHaveText('01');
+        await expect(page.locator('.score-number').first()).toHaveText('1');
         // Regressão do destaque offline: o atleta deve aparecer logo após o
         // ponto, sem depender da reconexão com o servidor.
         await expect(page.locator('#artilheiro-cards')).toContainText(fixture.nomeAtleta, { timeout: 10_000 });
@@ -267,9 +267,9 @@ test.describe('Mesário — fluxo visual completo offline', () => {
         await expect(page.locator('#msgArtilheiro')).toContainText(/Ponto (registrado|salvo)/i, { timeout: 10_000 });
         await expect(page.locator('#placar-status-announcer')).toContainText(/ponto salvo neste dispositivo.*aguardando/i);
         await expect(page.locator('#modalArtilheiro')).toBeHidden({ timeout: 10_000 });
-        await expect(page.locator('.score-number').first()).toHaveText('02');
+        await expect(page.locator('.score-number').first()).toHaveText('2');
         await page.locator('.btn-score-minus').first().click();
-        await expect(page.locator('.score-number').first()).toHaveText('01');
+        await expect(page.locator('.score-number').first()).toHaveText('1');
         await expect.poll(() => page.evaluate(() => window.SGIOffline.getState().pending)).toBeGreaterThanOrEqual(3);
 
         // Registra uma ocorrência disciplinar usando as listas locais.

@@ -178,7 +178,7 @@ test.describe('Mesário — persistência imediata do placar', () => {
         await expect(page.locator('#lista-eventos')).toBeVisible();
         await navegar(page, 'jogos', { id_jogo: fixture.idJogo, origem: 'agenda_edit' });
         await expect(page.locator('#placar-conteudo')).toBeVisible();
-        await expect(page.locator('.score-number').first()).toHaveText('01');
+        await expect(page.locator('.score-number').first()).toHaveText('1');
         const artilheiro = page.locator('#modalArtilheiro');
         if (await artilheiro.isVisible()) {
             await artilheiro.locator('.btn-close').click();
@@ -192,7 +192,7 @@ test.describe('Mesário — persistência imediata do placar', () => {
         // A anulação não abre o seletor: ela remove o último ponto ativo,
         // mantendo o registro histórico do atleta.
         await page.locator('.btn-score-minus').first().click();
-        await expect(page.locator('.score-number').first()).toHaveText('02');
+        await expect(page.locator('.score-number').first()).toHaveText('2');
         await navegar(page, 'agenda', { id: fixture.idInterclasse });
         await expect(page.locator('#lista-eventos')).toBeVisible();
         await expect.poll(() => page.evaluate(() => window.SGIOffline.getState().pending)).toBeGreaterThanOrEqual(3);
@@ -204,7 +204,7 @@ test.describe('Mesário — persistência imediata do placar', () => {
 
         await navegar(page, 'jogos', { id_jogo: fixture.idJogo, origem: 'agenda_edit' });
         await expect(page.locator('#placar-conteudo')).toBeVisible();
-        await expect(page.locator('.score-number').first()).toHaveText('02');
+        await expect(page.locator('.score-number').first()).toHaveText('2');
         expect((await lerPlacarLocal(page, fixture.idJogo))[0]).toBe(2);
 
         await context.setOffline(false);

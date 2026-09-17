@@ -50,7 +50,7 @@ async function validarDadosJogoOffline(page, esperado, opcoes = {}) {
 
     if (opcoes.placarInicial !== false) {
         const placares = (await page.locator('.score-number').allTextContents()).map((valor) => valor.trim());
-        expect(placares).toEqual(['00', '00']);
+        expect(placares).toEqual(['0', '0']);
     }
 }
 
@@ -555,7 +555,7 @@ test.describe.serial('Mesário — torneio completo online e offline', () => {
             }))
         }, { placarInicial: false });
         const placarFinalPersistido = (await page.locator('.score-number').allTextContents()).map((valor) => valor.trim());
-        expect(placarFinalPersistido).toEqual(['03', '00']);
+        expect(placarFinalPersistido).toEqual(['3', '0']);
 
         const estadoFilaOffline = await page.evaluate(() => window.SGIOffline.getState());
         expect(estadoFilaOffline.online).toBe(false);
