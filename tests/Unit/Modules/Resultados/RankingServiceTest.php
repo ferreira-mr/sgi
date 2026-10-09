@@ -29,15 +29,43 @@ final class RankingServiceTest extends TestCase
             'pontuacao_turma' => -1,
         ]);
     }
+    public function testReconciliarCallsRepository(): void
+    {
+        $repository = new InMemoryRankingRepository();
+        $updater = new InMemoryTurmaRankingUpdater();
+        $service = new RankingService($repository, $updater);
+
+        $result = $service->reconciliar(4);
+        self::assertSame(['reconciliadas' => 3, 'total_turmas' => 3, 'turmas' => []], $result);
+        self::assertSame(4, $repository->reconciledEditionId);
+    }
+
+    public function testReconciliarRejectsInvalidEdition(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $service = new RankingService(new InMemoryRankingRepository(), new InMemoryTurmaRankingUpdater());
+        $service->reconciliar(0);
+    }
 }
 
 final class InMemoryRankingRepository implements RankingRepository
 {
+    public ?int $reconciledEditionId = null;
+
     public function list(array $filters): array
     {
         return [];
     }
 
+    public function reconciliarEdicao(int $editionId): array
+    {
+        $this->reconciledEditionId = $editionId;
+        return [
+            'reconciliadas' => 3,
+            'total_turmas' => 3,
+            'turmas' => [],
+        ];
+    }
 }
 
 final class InMemoryTurmaRankingUpdater implements TurmaRankingUpdater

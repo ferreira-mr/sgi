@@ -44,29 +44,19 @@ final class MysqliChaveamentoManagement implements ChaveamentoManagement
                 ? ['success' => true, 'participantes' => MysqliIndividualRepository::buscarParticipantes($this->connection, $id)]
                 : MysqliIndividualRepository::montarJsonRanking($this->connection, $id);
         }
-        return $action === 'historico'
-            ? MysqliChaveamentoRepository::montarHistorico($this->connection, $id)
-            : MysqliChaveamentoRepository::montarJsonArvore($this->connection, $id);
+        return $this->atomic(function () use ($id, $action): array {
+            // Mantém chaves antigas coerentes quando um bye no último slot já
+            // estava concluído antes da correção do avanço.
+            MysqliChaveamentoRepository::reconciliarAvancosPendentes($this->connection, $id);
+            return $action === 'historico'
+                ? MysqliChaveamentoRepository::montarHistorico($this->connection, $id)
+                : MysqliChaveamentoRepository::montarJsonArvore($this->connection, $id);
+        });
     }
 
     public function saveIndividual(int $id, ?array $ranking, ?int $gameId = null): array
     {
         return $this->atomic(fn (): array => $this->individual->registrar($id, $ranking, $gameId));
-    }
-
-    public function createBracket(int $id): array
-    {
-        return $this->atomic(function () use ($id): array {
-            $teams = MysqliChaveamentoRepository::buscarEquipesValidadas($this->connection, $id);
-            if (count($teams) < 2) {
-                throw new \InvalidArgumentException('É necessário ao menos duas equipes ativas com competidores vinculados (elenco).');
-            }
-            $result = MysqliChaveamentoRepository::criarChaveamentoInicial($this->connection, $id, $teams);
-            foreach ($result['bye_jogos'] as $bye) {
-                MysqliChaveamentoRepository::chaveamentoProcessarAvanco($this->connection, (int) $bye);
-            }
-            return ['success' => true, 'message' => 'Chaveamento mata-mata gerado.', 'jogos_criados' => $result['jogos_criados'], 'bye_inicial' => count($result['bye_jogos'])];
-        });
     }
 
     /** @param callable():array<string, mixed> $action

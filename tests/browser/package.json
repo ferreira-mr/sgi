@@ -4,7 +4,8 @@
   "description": "Fluxos visuais do SGI no navegador",
   "scripts": {
     "test": "playwright test",
-    "test:headed": "playwright test --headed"
+    "test:headed": "playwright test --headed",
+    "test:offline-queue": "node run-offline-queue.cjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0"

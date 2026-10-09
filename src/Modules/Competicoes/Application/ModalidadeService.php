@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Competicoes\Application;
 
 use App\Modules\Competicoes\Domain\ModalidadeRepository;
+use App\Modules\Competicoes\Domain\CronogramaRules;
 use InvalidArgumentException;
 
 final class ModalidadeService
@@ -39,11 +40,16 @@ final class ModalidadeService
 
         $maxInscritos = self::normalizarLimite($data['max_inscrito_modalidade'] ?? null) ?? 0;
         $maxEquipes = self::normalizarLimite($data['max_equipes'] ?? null);
+        $planned = $this->plannedFields($data);
+        if (isset($planned['equipes_planejadas'])) {
+            $maxEquipes = (int) $planned['equipes_planejadas'];
+        }
         return $this->modalidades->create([
             'nome_modalidade' => $nome,
             'genero_modalidade' => $this->normalizarGenero((string) ($data['genero_modalidade'] ?? '')),
             'max_inscrito_modalidade' => $maxInscritos,
             'max_equipes' => $maxEquipes,
+            ...$planned,
             'tipos_modalidades_id_tipo_modalidade' => $tipoId,
             'status_modalidade' => self::normalizarStatus(array_key_exists('status_modalidade', $data) ? $data['status_modalidade'] : '1'),
             'categorias_id_categoria' => $categoriaId,
@@ -88,6 +94,10 @@ final class ModalidadeService
         }
         if (array_key_exists('max_equipes', $data)) {
             $updates['max_equipes'] = self::normalizarLimite($data['max_equipes']);
+        }
+        $updates = array_merge($updates, $this->plannedFields($data, false));
+        if (array_key_exists('equipes_planejadas', $updates)) {
+            $updates['max_equipes'] = (int) $updates['equipes_planejadas'];
         }
         if ($updates === []) {
             throw new InvalidArgumentException('Nenhum dado fornecido para atualização.');
@@ -163,5 +173,31 @@ final class ModalidadeService
             'MISTO', 'MIXTO', 'MIX' => 'MISTO',
             default => throw new InvalidArgumentException('Gênero da modalidade inválido.'),
         };
+    }
+
+    /** @return array<string,mixed> */
+    private function plannedFields(array $data, bool $creating = true): array
+    {
+        $fields = ['equipes_planejadas', 'min_inscritos_equipe', 'max_inscritos_equipe', 'formato_participacao', 'duracao_prevista_min', 'descanso_min'];
+        $present = array_intersect($fields, array_keys($data));
+        if ($present === []) {
+            return [];
+        }
+        if (!$creating && count(array_diff($fields, $present)) > 0) {
+            // Atualização parcial: a infraestrutura revalida o estado final.
+            return array_reduce($present, static function (array $carry, string $field) use ($data): array {
+                $carry[$field] = $data[$field];
+                return $carry;
+            }, []);
+        }
+        $config = CronogramaRules::modalidade($data);
+        return [
+            'equipes_planejadas' => $config['quantidade'],
+            'min_inscritos_equipe' => $config['min'],
+            'max_inscritos_equipe' => $config['max'],
+            'formato_participacao' => $config['formato'],
+            'duracao_prevista_min' => $config['duracao'],
+            'descanso_min' => $config['descanso'],
+        ];
     }
 }

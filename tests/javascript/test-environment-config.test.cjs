@@ -56,6 +56,30 @@ test('Compose publica o servidor de teste apenas no loopback por padrão', () =>
     );
 });
 
+test('a jornada de navegador da simulação preserva a edição entre operação e reconciliação', () => {
+    const compose = fs.readFileSync(composePath, 'utf8');
+    const playwright = fs.readFileSync(path.join(root, 'tests/browser/playwright.config.cjs'), 'utf8');
+    const browserService = compose.slice(compose.indexOf('\n  browser-simulation:'), compose.indexOf('\n  visual:', compose.indexOf('\n  browser-simulation:')));
+
+    assert.match(playwright, /testIgnore:\s*\[\.\.\.independentSpecs, \.\.\.simulationSpecs\]/);
+    assert.match(playwright, /SGI_RUN_SIMULATION_PORTAL\s*===\s*'1'/);
+    assert.match(browserService, /SGI_RUN_SIMULATION_PORTAL:\s*"1"/);
+    assert.match(browserService, /--project=simulation/);
+    assert.match(compose, /browser-simulation:\s*\n[\s\S]*?SGI_RUN_SIMULATION_PORTAL/);
+    assert.match(compose, /browser-simulation-events:\s*\n[\s\S]*?opera a edição preparada/);
+    const dockerRunner = fs.readFileSync(path.join(root, 'tools/test-docker.ps1'), 'utf8');
+    assert.match(dockerRunner, /SGI_SIMULATION_PHASE = 'finalize'/);
+    assert.match(dockerRunner, /SGI_TEST_PRESERVE_DATABASE = '1'/);
+
+    for (const runner of [
+        fs.readFileSync(path.join(root, 'tools/test-docker.ps1'), 'utf8'),
+        fs.readFileSync(path.join(root, 'tools/test-docker.sh'), 'utf8'),
+        fs.readFileSync(path.join(root, 'tools/test-local.ps1'), 'utf8'),
+    ]) {
+        assert.match(runner, /bin\/sgi\.php.*migrate|bin.sgi.php.*migrate/);
+    }
+});
+
 test('Compose quality falha quando qualquer verificação obrigatória falha', () => {
     const compose = fs.readFileSync(composePath, 'utf8');
     const start = compose.indexOf('\n  quality:');
@@ -123,7 +147,7 @@ test('Compose resolve a base vazia mesmo com .env sintético conflitante', (t) =
 
         assert.equal(result.status, 0, result.stderr || result.error?.message || 'docker compose config falhou');
         const resolved = JSON.parse(result.stdout);
-        for (const service of ['app', 'integration', 'browser', 'visual']) {
+        for (const service of ['app', 'integration', 'browser', 'browser-simulation', 'browser-simulation-events', 'visual']) {
             assert.equal(resolved.services[service].environment.SGI_BASE_PATH, '', `${service} deve resolver para a raiz`);
             assert.equal(resolved.services[service].environment.SGI_TEST_BASE_URL, 'http://sgi-web:8099');
             assert.equal(resolved.services[service].environment.SGI_BASE_URL, 'http://sgi-web:8099/');

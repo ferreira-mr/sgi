@@ -34,7 +34,7 @@ function renderCards(items) {
             const iconClass = isAtivo ? 'active' : 'inactive';
             const idInterclasse = encodeURIComponent(String(item.id_interclasse));
             const href = isAtivo ? `${APP_BASE}/aluno/modalidades?id=${idInterclasse}` : `${APP_BASE}/aluno/ranking?id=${idInterclasse}`;
-            const btnLabel = isAtivo ? 'Ver Detalhes <i class="bi bi-arrow-right"></i>' : 'Ver Ranking <i class="bi bi-bar-chart"></i>';
+            const btnLabel = isAtivo ? 'Inscrever-se em modalidades <i class="bi bi-arrow-right"></i>' : 'Ver Ranking <i class="bi bi-bar-chart"></i>';
 
             return `
                 <div class="col">

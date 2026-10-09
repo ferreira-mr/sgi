@@ -14,6 +14,8 @@ use RuntimeException;
 
 final class MysqliAgendamentoBlocoRepository
 {
+    private ?bool $planningAvailable = null;
+
     public function __construct(
         private readonly mysqli $connection,
         private readonly AgendamentoBlocoScheduler $scheduler = new AgendamentoBlocoScheduler(),
@@ -24,6 +26,7 @@ final class MysqliAgendamentoBlocoRepository
     /** @return array{edicao:int,resultado:array<string,mixed>} */
     public function simulate(array $payload, int $edition): array
     {
+        $this->assertUnpublishedCalendar($edition);
         $this->validateWindows($payload, $edition);
         $selected = $this->selectedMatches($payload, $edition);
         if ($selected === []) {
@@ -50,6 +53,7 @@ final class MysqliAgendamentoBlocoRepository
      */
     public function simulateSequential(array $payload, int $edition): array
     {
+        $this->assertUnpublishedCalendar($edition);
         $modality = (int) ($payload['id_modalidade'] ?? 0);
         if ($modality <= 0) {
             throw new InvalidArgumentException('Informe a modalidade para o agendamento sequencial.');
@@ -569,6 +573,31 @@ final class MysqliAgendamentoBlocoRepository
         if (TipoCompeticaoRules::resolve($row) !== TipoCompeticaoRules::MATA_MATA) {
             throw new InvalidArgumentException('O agendamento automático está disponível somente para modalidades Mata-Mata.');
         }
+    }
+
+    private function assertUnpublishedCalendar(int $edition): void
+    {
+        if (!$this->planningAvailable()) {
+            return;
+        }
+        $planning = $this->one("SELECT id_interclasse FROM interclasse_planejamentos WHERE id_interclasse = ? AND cronograma_status = 'publicado' LIMIT 1", 'i', [$edition]);
+        if ($planning !== null) {
+            throw new InvalidArgumentException('O cronograma publicado já define os horários e confrontos desta edição.');
+        }
+    }
+
+    private function planningAvailable(): bool
+    {
+        if ($this->planningAvailable !== null) {
+            return $this->planningAvailable;
+        }
+        $result = $this->connection->query("SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'interclasse_planejamentos' LIMIT 1");
+        if ($result === false) {
+            return $this->planningAvailable = false;
+        }
+        $exists = $result->num_rows > 0;
+        $result->free();
+        return $this->planningAvailable = $exists;
     }
 
     private function lockEdition(int $edition): void

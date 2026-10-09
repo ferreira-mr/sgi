@@ -58,11 +58,11 @@ if ($barrier === '' || $workerId === '') {
 
 $ready = $barrier . DIRECTORY_SEPARATOR . 'ready-' . $workerId;
 $release = $barrier . DIRECTORY_SEPARATOR . 'release';
-if (@file_put_contents($ready, json_encode([
+if (!writeAtomicBarrierFile($ready, json_encode([
     'pid' => getmypid(),
     'db_thread' => $connection->thread_id,
     'worker' => $workerId,
-], JSON_THROW_ON_ERROR), LOCK_EX) === false) {
+], JSON_THROW_ON_ERROR))) {
     fwrite(STDERR, 'Não foi possível anunciar o worker concorrente.');
     exit(1);
 }
@@ -227,7 +227,7 @@ function finalizeGameAfterSnapshot(mysqli $connection, int $gameId, int $modalit
         static function () use ($gateway, $gameId, $modalityId, $results, $barrier): array {
             // Establish a REPEATABLE READ snapshot before the annulment commits.
             $gateway->resolveAndValidate($gameId, null, $modalityId, $results);
-            if (@file_put_contents($barrier . DIRECTORY_SEPARATOR . 'snapshot', 'ready', LOCK_EX) === false) {
+            if (!writeAtomicBarrierFile($barrier . DIRECTORY_SEPARATOR . 'snapshot', 'ready')) {
                 throw new RuntimeException('Não foi possível sinalizar o snapshot da finalização.');
             }
             awaitBarrier($barrier . DIRECTORY_SEPARATOR . 'continue', 'snapshot da finalização');
@@ -235,6 +235,20 @@ function finalizeGameAfterSnapshot(mysqli $connection, int $gameId, int $modalit
         },
     );
     return ($result['success'] ?? false) === true ? 'accepted' : 'rejected';
+}
+
+function writeAtomicBarrierFile(string $path, string $content): bool
+{
+    $tmp = $path . '.tmp.' . getmypid() . '.' . bin2hex(random_bytes(4));
+    if (@file_put_contents($tmp, $content, LOCK_EX) === false) {
+        @unlink($tmp);
+        return false;
+    }
+    if (!@rename($tmp, $path)) {
+        @unlink($tmp);
+        return false;
+    }
+    return true;
 }
 
 function awaitBarrier(string $path, string $description): void

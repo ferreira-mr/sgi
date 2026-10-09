@@ -10,7 +10,7 @@ $labelNiveis = [
     0 => ['label' => 'Administrador', 'icon' => 'bi-shield-fill-check', 'color' => '#E30613'],
     1 => ['label' => 'Colaborador',   'icon' => 'bi-person-badge-fill', 'color' => '#0d6efd'],
     2 => ['label' => 'Mesário',       'icon' => 'bi-person-check-fill', 'color' => '#6f42c1'],
-    3 => ['label' => 'Aluno',         'icon' => 'bi-person-fill',       'color' => '#198754'],
+    3 => ['label' => 'Estudante',     'icon' => 'bi-person-fill',       'color' => '#198754'],
 ];
 $nivelInfo = $labelNiveis[$nivelUsuario] ?? ['label' => 'Desconhecido', 'icon' => 'bi-question-circle', 'color' => '#6c757d'];
 $nivelBadgeClass = [0 => 'text-bg-danger', 1 => 'text-bg-primary', 2 => 'text-bg-secondary', 3 => 'text-bg-success'][$nivelUsuario] ?? 'text-bg-secondary';
@@ -19,12 +19,22 @@ include SGI_ROOT . '/resources/views/components/aluno-header.php';
 
 $paginaAtiva = 'perfil';
 include SGI_ROOT . '/resources/views/components/aluno-nav.php';
+$urlAcessoInscricoes = !empty($termoAceito)
+    ? $preservarEdicaoNoLink(\App\Shared\Http\Url::to('aluno/modalidades'), 'inscricao')
+    : \App\Shared\Http\Url::to('aluno/termos');
+$textoAcessoInscricoes = !empty($termoAceito) ? 'Inscrever-se em modalidades' : 'Leia e aceite os termos para se inscrever';
 
 ?>
 
 <!-- ===================== MOBILE ===================== -->
 <main class="d-md-none p-3 pt-3 pb-5">
     <h5 class="fw-bold mb-4">Configurações da Conta</h5>
+
+    <?php if ($nivelUsuario === 3): ?>
+        <a href="<?= htmlspecialchars($urlAcessoInscricoes, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2 rounded-3 mb-3">
+            <i class="bi bi-card-checklist" aria-hidden="true"></i><?= htmlspecialchars($textoAcessoInscricoes, ENT_QUOTES, 'UTF-8') ?>
+        </a>
+    <?php endif; ?>
 
     <div class="card border-0 shadow-sm rounded-4 mb-3">
         <div class="card-body text-center py-4">
@@ -86,6 +96,14 @@ include SGI_ROOT . '/resources/views/components/aluno-nav.php';
         include SGI_ROOT . '/resources/views/components/page-header.php';
         unset($headerMostrarVoltar, $headerCorpoHtml, $headerAcoesHtml, $headerClasse, $headerUrlVoltar, $headerIdVoltar, $headerClassBotao, $headerHiddenBotao);
         ?>
+
+        <?php if ($nivelUsuario === 3): ?>
+            <div class="d-flex justify-content-end mb-3">
+                <a href="<?= htmlspecialchars($urlAcessoInscricoes, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-primary d-inline-flex align-items-center gap-2">
+                    <i class="bi bi-card-checklist" aria-hidden="true"></i><?= htmlspecialchars($textoAcessoInscricoes, ENT_QUOTES, 'UTF-8') ?>
+                </a>
+            </div>
+        <?php endif; ?>
 
         <!-- Grid: 260px + 1fr -->
         <div class="row g-4 align-items-start">
@@ -246,8 +264,6 @@ include SGI_ROOT . '/resources/views/components/aluno-nav.php';
 
 <input type="file" id="fotoUploadInput" accept="image/jpeg,image/png,image/gif,image/webp" class="d-none">
 
-<script src="<?= \App\Shared\Http\Assets::url('vendor/bootstrap/js/bootstrap.bundle.min.js') ?>" crossorigin="anonymous"></script>
 <script type="application/json" data-sgi-config="aluno/perfil"><?= json_encode(['value2' => ($usuarioPerfil['nome_usuario'] ?? ''), 'value3' => ($usuarioPerfil['matricula_usuario'] ?? ''), 'value4' => ($sessionId ?? 0), 'value5' => ((int)($nivelUsuario ?? 3))], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR) ?></script>
 <script data-sgi-page src="<?= \App\Shared\Http\Assets::url('js/pages/aluno/perfil.js') ?>"></script>
-</body>
-</html>
+<?php include SGI_ROOT . '/resources/views/components/footer.php'; ?>

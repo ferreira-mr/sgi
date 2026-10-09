@@ -248,6 +248,9 @@ window.SGIPage.mount("disciplina/ocorrencias", function (pageConfig, pageScope) 
         }
     }
 
+    const btnSalvarOcrModal = document.getElementById('btnSalvarOcrModal');
+    if (btnSalvarOcrModal) pageScope.listen(btnSalvarOcrModal, 'click', salvarOcorrenciaModal);
+
     window.SGIPage.ready( carregarDados);
 
 return {esc, resolverInterclasse, carregarDados, turmasFiltradas, carregarLista, abrirModalOcorrencia, salvarOcorrenciaModal, abrirHistoricoTurma, carregarHistorico, removerOcorrencia};

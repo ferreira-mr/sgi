@@ -100,8 +100,20 @@ final class MysqliPartidaGateway implements ResultadoRepository
             throw new ModalidadeNaoEncontradaException('Modalidade não encontrada.');
         }
         $normalizedTag = trim((string) $tag);
-        if (ChaveamentoRules::parse($normalizedTag) === null || strlen($normalizedTag) > 45) {
+        $tagIdentity = ChaveamentoRules::parse($normalizedTag);
+        if ($tagIdentity === null || strlen($normalizedTag) > 45) {
             throw new \InvalidArgumentException('A tag do jogo temporário é inválida.');
+        }
+        if (!empty($tagIdentity['planejado'])) {
+            if ((int) ($tagIdentity['modalidade'] ?? 0) !== $modalityId) {
+                throw new \InvalidArgumentException('A tag planejada não pertence à modalidade informada.');
+            }
+            return [
+                'game_id' => 0,
+                'modality_id' => $modalityId,
+                'edition_id' => $edition,
+                'tag' => $normalizedTag,
+            ];
         }
         $existing = MysqliChaveamentoRepository::buscarJogoPorTag($this->connection, $modalityId, $normalizedTag);
         return [
@@ -204,11 +216,17 @@ final class MysqliPartidaGateway implements ResultadoRepository
 
     public function avancarChaveamento(int $gameId): void
     {
+        if ((new MysqliCronogramaRepository($this->connection))->advancePlannedFromGame($gameId)) {
+            return;
+        }
         MysqliChaveamentoRepository::chaveamentoProcessarAvanco($this->connection, $gameId);
     }
 
     public function reconstruirChaveamento(int $modalityId, int $largura): void
     {
+        if ((new MysqliCronogramaRepository($this->connection))->rebuildPlannedFromRound($modalityId, $largura)) {
+            return;
+        }
         MysqliChaveamentoRepository::chaveamentoRebuildFromRound($this->connection, $modalityId, $largura);
     }
 
@@ -237,6 +255,18 @@ final class MysqliPartidaGateway implements ResultadoRepository
         }
 
         $teamIds = $this->teamIds($results);
+        $tagValue = $context['tag'];
+        if ($tagValue !== null && $tagValue !== '') {
+            $plannedGameId = (new MysqliCronogramaRepository($this->connection))->materializePlannedGameForResult(
+                $context['edition_id'],
+                $context['modality_id'],
+                $tagValue,
+                $teamIds,
+            );
+            if ($plannedGameId !== null) {
+                return $plannedGameId;
+            }
+        }
         $candidates = $this->findCandidateGames(
             $context['modality_id'],
             $context['edition_id'],
@@ -249,7 +279,6 @@ final class MysqliPartidaGateway implements ResultadoRepository
             return $candidates[0];
         }
 
-        $tagValue = $context['tag'];
         if ($tagValue === null || $tagValue === '') {
             throw new RuntimeException('Não foi possível identificar a tag do jogo temporário.');
         }

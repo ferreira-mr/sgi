@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   quality:
     runs-on: ubuntu-latest
@@ -50,11 +53,15 @@ jobs:
           mkdir -p test-results
           docker compose -f compose.test.yml logs --no-color app db > test-results/docker-compose.log
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
-          name: integration-${{ strategy.job-index }}
+          name: integration-results
+          retention-days: 7
+          if-no-files-found: warn
           path: |
             test-results/*.log
+            test-results/integration-timings.json
+            test-results/*playwright.json
             tests/browser/test-results/
             tests/browser/playwright-report/
       - name: Limpar ambiente descartável
@@ -87,11 +94,15 @@ jobs:
           mkdir -p test-results
           docker compose -f compose.test.yml logs --no-color app db > test-results/docker-compose-visual.log
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
-          name: visual-differences
+          name: visual-contract-results
+          retention-days: 7
+          if-no-files-found: warn
           path: |
             test-results/*.log
+            test-results/integration-timings.json
+            test-results/*playwright.json
             tests/browser/test-results/
             tests/browser/playwright-report/
       - name: Limpar ambiente descartável

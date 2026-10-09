@@ -6,7 +6,8 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require_once SGI_ROOT . '/bootstrap/autoload.php';
 use App\Shared\Http\CsrfGuard;
-if ((int) ($_SESSION['nivel'] ?? -1) !== 3) {
+$nivelUsuario = (int) ($_SESSION['nivel'] ?? -1);
+if ($nivelUsuario !== 3) {
     header('Location: ' . \App\Shared\Http\Url::to('aluno/login'));
     exit;
 }
@@ -59,42 +60,13 @@ echo json_encode(\App\Shared\Http\Url::to('assets'), JSON_HEX_TAG | JSON_HEX_AMP
     <?php endif; ?>
     <script src="<?= \App\Shared\Http\Assets::url('js/shared/http-client.js') ?>"></script>
     <script src="<?= \App\Shared\Http\Assets::url('js/shared/bootstrap-feedback.js') ?>"></script>
-    <script src="<?= \App\Shared\Http\Assets::url('js/shared/html-utils.js') ?>"></script>
+<script src="<?= \App\Shared\Http\Assets::url('js/shared/html-utils.js') ?>"></script>
 
 <script src="<?= \App\Shared\Http\Assets::url('js/shared/page-runtime.js') ?>"></script>
+<script src="<?= \App\Shared\Http\Assets::url('js/shared/logout.js') ?>"></script>
 <?php if (\App\Shared\Config\Env::get('SGI_APP_ENV', '') === 'development'): ?>
     <script src="<?= \App\Shared\Http\Assets::url('js/dev/live-reload.js') ?>"></script>
 <?php endif; ?>
-<script>
-(function () {
-    document.addEventListener('click', async function (event) {
-        var link = event.target.closest && event.target.closest('[data-sgi-logout]');
-        if (!link) return;
-        if (event.defaultPrevented) return;
-        if (link.dataset.sgiLogoutPending === '1') return;
-        event.preventDefault();
-        link.dataset.sgiLogoutPending = '1';
-        if (window.SGI && typeof window.SGI.confirm === 'function') {
-            var autorizado = await window.SGI.confirm({
-                titulo: 'Sair do SGI?',
-                mensagem: 'Sua sessão será encerrada neste dispositivo.',
-                textoConfirmar: 'Sair'
-            });
-            if (!autorizado) {
-                delete link.dataset.sgiLogoutPending;
-                return;
-            }
-        }
-        fetch(link.href, {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {'X-SGI-CSRF': window.SGI_CSRF_TOKEN || ''}
-        }).finally(function () {
-            window.location.href = <?= json_encode(\App\Shared\Http\Url::to('aluno/login')) ?>;
-        });
-    });
-})();
-</script>
 </head>
 <body class="bg-light d-flex flex-column min-vh-100 sgi-app-shell">
 <a class="sgi-skip-link" href="#sgi-main-content">Ir para o conteúdo</a>

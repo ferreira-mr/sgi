@@ -162,11 +162,44 @@ Uma instalação nova não contém o evento de demonstração da suíte de teste
 
 1. Crie uma edição do Interclasses e deixe a edição desejada ativa.
 2. Confira as categorias, turmas, modalidades e equipes geradas e ajuste os cadastros.
-3. Cadastre ou importe alunos e prepare as inscrições/equipes que participarão dos jogos.
-4. Cadastre um usuário mesário e configure os locais e jogos para experimentar o placar.
-5. Faça login com cada perfil para conferir suas telas e permissões.
+3. Nas edições novas, informe em cada modalidade a quantidade de equipes/entradas por turma e os limites do elenco; prepare as equipes vazias antes de cadastrar os alunos.
+4. Na Agenda, prepare as equipes vazias, gere a grade e publique o cronograma antes das inscrições. Se precisar corrigir os horários antes de liberar a competição, encerre as inscrições, reabra a revisão e gere/publique uma nova grade; a revisão substitui os compromissos da publicação suspensa e preserva as reservas independentes. Depois da liberação, a árvore não pode ser substituída. Os alunos podem consultar os confrontos previstos e escolher as modalidades com essa informação; o servidor recusa conflitos de horário entre modalidades, inclusive nas fases condicionais.
+5. Cadastre ou importe alunos e acompanhe as inscrições nas equipes exatas da turma. Ao final da janela, encerre as inscrições, resolva os elencos incompletos e use **Liberar competição**; essa ação cria os jogos iniciais com base na árvore e nos horários publicados.
+6. Cadastre um usuário mesário. Depois da liberação, ele poderá operar as partidas disponíveis pelo placar; resultados avançam os próximos confrontos mantendo a agenda publicada.
+7. Faça login com cada perfil para conferir suas telas e permissões.
 
 Use dados fictícios nas atividades de desenvolvimento. Para cenários automatizados já preparados, siga a próxima seção; os fixtures de testes não devem ser carregados sobre sua base de trabalho.
+
+A tela Chaveamento acompanha a árvore publicada e seus resultados. Ela não gera uma chave separada: prepare, publique, abra/encerre inscrições e libere a competição pelo fluxo da Agenda.
+
+### Homologação zerada na rede local
+
+Para disponibilizar uma instalação limpa para outros dispositivos da mesma rede, use o Compose dedicado abaixo. Ele cria um MariaDB e volumes persistentes exclusivos; não usa `.env`, banco, uploads ou sessões do ambiente de desenvolvimento. Não use `down --volumes` enquanto quiser preservar os dados da homologação.
+
+Crie `.env.homologacao` na raiz (o arquivo é ignorado pelo Git) com credenciais próprias e o IPv4 da interface de rede autorizada:
+
+```dotenv
+COMPOSE_PROJECT_NAME=sgi-homologacao-limpa
+SGI_HML_BIND_ADDRESS=10.141.117.3
+SGI_HML_HOST_PORT=8100
+SGI_HML_APP_URL=http://10.141.117.3:8100/
+SGI_HML_DB_PASSWORD=troque-por-uma-senha-forte-do-banco
+SGI_HML_ADMIN_LOGIN=admin-homologacao
+SGI_HML_ADMIN_NAME=Administrador Homologação
+SGI_HML_ADMIN_PASSWORD=troque-por-uma-senha-forte-do-administrador
+```
+
+Troque os dois segredos antes de iniciar e compartilhe a senha do administrador somente com quem fará os testes. A senha fica no arquivo local `.env.homologacao`, não nos logs. Suba e confira a instalação:
+
+```powershell
+docker compose --env-file .env.homologacao -f compose.homologacao.yml up -d --build --wait
+docker compose --env-file .env.homologacao -f compose.homologacao.yml ps
+Invoke-WebRequest http://10.141.117.3:8100/api/v1/health
+```
+
+Acesse `http://10.141.117.3:8100/` a partir dos dispositivos na mesma rede. Se o Windows Defender Firewall bloquear a conexão, crie uma regra de entrada TCP somente para a sub-rede local autorizada (neste exemplo, `10.141.117.0/25`); não exponha a porta à internet. O servidor containerizado atende na porta `8100` do host. Logs: `docker compose --env-file .env.homologacao -f compose.homologacao.yml logs --tail 200 app db`.
+
+Para parar e preservar os dados: `docker compose --env-file .env.homologacao -f compose.homologacao.yml stop`. Para reiniciar: `... start`. A remoção dos containers sem apagar volumes é `... down`; para uma nova homologação realmente zerada, apague deliberadamente os volumes exclusivos com `... down --volumes` e então execute `up` novamente. Confira o nome do projeto antes de remover volumes.
 
 ## Testes automatizados
 
@@ -210,6 +243,12 @@ Para uma verificação de qualidade sem banco nem servidor:
 powershell -ExecutionPolicy Bypass -File tools/test-local.ps1 -Suite quality
 ```
 
+Durante o desenvolvimento, rode o subconjunto ligado à mudança:
+`composer test:unit` para regras PHP, `npm test` para JavaScript ou
+`npm --prefix tests/browser run test:offline-queue` para a regressão IndexedDB
+sem servidor nem banco SQL. Essas execuções dão feedback focalizado e não
+substituem o perfil completo ao concluir uma mudança funcional.
+
 Esse perfil executa `composer verify`, `npm run build`, `npm run check` e `npm test`. Ele não substitui integração e navegador. Antes e depois de refatorações, execute a suíte completa. Acrescente `-IncludeVisual` para as comparações de imagem.
 
 ### Execução sem banco
@@ -237,7 +276,12 @@ Compose for publicada no host, o padrão é o loopback `127.0.0.1`; use
 explícito pela rede local. Esse fluxo valida o projeto; não é o servidor de
 desenvolvimento do passo 5.
 
-Os relatórios ficam em `test-results/` e, conforme o executor, em `tests/browser/test-results/` e `tests/browser/playwright-report/`. Consulte [o guia de testes](docs/testing.md) para perfis, execução Docker do runner HTTP, configuração do Playwright e diagnóstico.
+Os executores `test-local.ps1` e `test-docker.ps1` gravam um manifesto
+`run-manifest.json` em `test-results/` com revisão, perfil, seleção, etapas,
+durações e código de saída. O runner de integração registra também a duração
+de cada cenário em `integration-timings.json`. Playwright grava resultados JSON
+junto aos relatórios HTML, traces e screenshots. Consulte [o guia de
+testes](docs/testing.md) para perfis e diagnóstico.
 
 ### Contas exclusivas dos fixtures de teste
 

@@ -82,10 +82,11 @@ $paginaAtiva = 'categorias';
 <div class="modal fade" id="modalCriarTurma" tabindex="-1" aria-labelledby="modalCriarTurmaTitulo" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg rounded-4 p-2">
-            <div class="modal-header border-0 pb-0 justify-content-center">
+            <div class="modal-header border-0 pb-0 position-relative justify-content-center">
                 <h2 class="modal-title fw-bold text-center w-100 text-primary" id="modalCriarTurmaTitulo">
                     ADICIONAR TURMA
                 </h2>
+                <button type="button" class="btn-close position-absolute end-0 me-3" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
             <form id="formTurma">
                 <div class="modal-body pt-3 pb-3">

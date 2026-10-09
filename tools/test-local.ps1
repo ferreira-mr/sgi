@@ -15,6 +15,7 @@ $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $requiresDatabase = $Suite -in @('integration', 'browser', 'visual', 'all')
 $needsBrowser = $Suite -in @('browser', 'all') -or $IncludeVisual -or $Suite -eq 'visual'
+$deferSimulation = $requiresDatabase -and $needsBrowser
 $runId = ('{0:yyyyMMdd_HHmmss}_{1}' -f (Get-Date), ([guid]::NewGuid().ToString('N').Substring(0, 6))).ToLowerInvariant()
 $databaseName = "sgi_test_local_$($runId.Replace('_', ''))"
 $runRoot = Join-Path $root "test-results\local-$runId"
@@ -25,7 +26,77 @@ $originalEnvironment = @{}
 $originalEnvironment['PATH'] = [Environment]::GetEnvironmentVariable('PATH', 'Process')
 $startedResources = $false
 $exitCode = 0
+$runStartedAt = [DateTimeOffset]::UtcNow
+$runTimer = [System.Diagnostics.Stopwatch]::StartNew()
+$script:runStatus = 'running'
+$script:runSteps = [System.Collections.Generic.List[object]]::new()
 New-Item -ItemType Directory -Force -Path $runRoot | Out-Null
+
+function Write-RunManifest {
+    $revision = $null
+    $workingTreeDirty = $null
+    $git = Get-CommandPath @('git.exe', 'git')
+    if ($git) {
+        $revisionOutput = & $git -C $root rev-parse HEAD 2>$null
+        if ($LASTEXITCODE -eq 0) { $revision = ($revisionOutput -join '').Trim() }
+        $statusOutput = & $git -C $root status --porcelain 2>$null
+        if ($LASTEXITCODE -eq 0) { $workingTreeDirty = [bool] ($statusOutput | Where-Object { $_ }) }
+    }
+
+    $manifest = [ordered]@{
+        schema_version = 1
+        run_id = $runId
+        suite = $Suite
+        database = if ($requiresDatabase) { $Database } else { $null }
+        revision = $revision
+        working_tree_dirty = $workingTreeDirty
+        started_at_utc = $runStartedAt.ToString('o')
+        finished_at_utc = [DateTimeOffset]::UtcNow.ToString('o')
+        duration_seconds = [math]::Round($runTimer.Elapsed.TotalSeconds, 3)
+        status = $script:runStatus
+        exit_code = $exitCode
+        environment_kept = $Keep.IsPresent
+        php_version = $script:phpVersion
+        node_version = $script:nodeVersion
+        artifacts_directory = $runRoot
+        integration_timings_json = if ($requiresDatabase) { Join-Path $runRoot 'integration-timings.json' } else { $null }
+        simulation_integration_timings_json = if ($requiresDatabase) { Join-Path $runRoot 'simulation-integration-timings.json' } else { $null }
+        browser_json = if ($needsBrowser) { Join-Path $runRoot 'playwright-results.json' } else { $null }
+        simulation_browser_json = if ($needsBrowser) { Join-Path $runRoot 'simulation-browser-results.json' } else { $null }
+        selection = [ordered]@{
+            quality = $Suite -in @('quality', 'all')
+            integration = $requiresDatabase
+            browser = $Suite -in @('browser', 'all')
+            visual = $IncludeVisual.IsPresent -or $Suite -eq 'visual'
+            individual_ranking = $Suite -in @('browser', 'all')
+            simulation_portal_browser = $deferSimulation
+            environment_kept = $Keep.IsPresent
+        }
+        steps = @($script:runSteps)
+    }
+    $manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $runRoot 'run-manifest.json') -Encoding utf8
+}
+
+function Invoke-RunStage {
+    param([Parameter(Mandatory)][string] $Name, [Parameter(Mandatory)][scriptblock] $Action)
+
+    $startedAt = [DateTimeOffset]::UtcNow
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    $step = [ordered]@{ name = $Name; started_at_utc = $startedAt.ToString('o'); duration_seconds = $null; status = 'running'; exit_code = $null }
+    try {
+        & $Action
+        $step.status = 'passed'
+    } catch {
+        $step.status = 'failed'
+        $step.exit_code = if ($LASTEXITCODE -is [int] -and $LASTEXITCODE -ne 0) { $LASTEXITCODE } else { 1 }
+        throw
+    } finally {
+        $timer.Stop()
+        $step.duration_seconds = [math]::Round($timer.Elapsed.TotalSeconds, 3)
+        $script:runSteps.Add([pscustomobject] $step)
+        Write-RunManifest
+    }
+}
 
 function Get-CommandPath {
     param([Parameter(Mandatory)][string[]] $Names)
@@ -65,9 +136,25 @@ function Invoke-Checked {
     )
 
     Write-Host "`n[$Description]"
-    & $FilePath @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "$Description falhou (código $LASTEXITCODE)."
+    $startedAt = [DateTimeOffset]::UtcNow
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    $stepStatus = 'passed'
+    $commandExitCode = 0
+    try {
+        & $FilePath @Arguments
+        $commandExitCode = $LASTEXITCODE
+        if ($commandExitCode -ne 0) {
+            $stepStatus = 'failed'
+            throw "$Description falhou (código $commandExitCode)."
+        }
+    } catch {
+        $stepStatus = 'failed'
+        if ($commandExitCode -eq 0) { $commandExitCode = 1 }
+        throw
+    } finally {
+        $timer.Stop()
+        $script:runSteps.Add([pscustomobject]@{ name = $Description; started_at_utc = $startedAt.ToString('o'); duration_seconds = [math]::Round($timer.Elapsed.TotalSeconds, 3); status = $stepStatus; exit_code = $commandExitCode })
+        Write-RunManifest
     }
 }
 
@@ -199,6 +286,7 @@ function Check-Prerequisites {
         }
     }
     Write-Host "PHP ${phpVersion}: $script:php"
+    $script:phpVersion = $phpVersion
 
     $script:composer = Get-CommandPath @('composer.bat', 'composer')
     $script:composerPhar = $null
@@ -207,6 +295,8 @@ function Check-Prerequisites {
         if (Test-Path -LiteralPath $adjacentPhar) { $script:composerPhar = $adjacentPhar }
     }
     $script:npm = Get-CommandPath @('npm.cmd', 'npm')
+    $node = Get-CommandPath @('node.exe', 'node')
+    $script:nodeVersion = if ($node) { ((& $node --version) -join '').Trim() } else { $null }
     if ($Suite -in @('quality', 'all') -and -not $script:composer) { throw 'Composer não foi encontrado no PATH.' }
     if (($Suite -in @('quality', 'all')) -and -not $script:npm) { throw 'npm não foi encontrado no PATH.' }
     if ($Suite -in @('quality', 'all') -and -not (Test-Path -LiteralPath (Join-Path $root 'vendor/autoload.php'))) {
@@ -260,6 +350,7 @@ function Start-TestServer {
         SGI_DB_USER = $script:dbUser
         SGI_DB_PASSWORD = $script:dbPassword
         SGI_TEST_DB_RUNTIME = 'container'
+        SGI_TEST_RESULTS_DIR = $runRoot
         SGI_BROWSER_REQUIRES_DATABASE = '1'
         SGI_E2E_RESET = '0'
         SGI_TEST_BASE_URL = $script:baseUrl
@@ -272,8 +363,15 @@ function Start-TestServer {
         SGI_MYSQL_PATH = $script:mysqlClient
         SGI_MYSQLDUMP_PATH = $script:mysqlDump
         SGI_TEST_RUN_ID = $runId
+        SGI_SIMULATION_RUN_ID = $runId
+        SGI_SIMULATION_PHASE = 'complete'
+        SGI_TEST_PRESERVE_DATABASE = '0'
+        SGI_TEST_INTEGRATION_SCENARIO = ''
+        SGI_TEST_DEFER_SIMULATION = if ($deferSimulation) { '1' } else { '0' }
         SGI_BROWSER_OUTPUT_DIR = Join-Path $runRoot 'browser'
         SGI_BROWSER_REPORT_DIR = Join-Path $runRoot 'playwright-report'
+        SGI_BROWSER_JSON_REPORT = Join-Path $runRoot 'playwright-results.json'
+        SGI_INDIVIDUAL_BROWSER = '1'
     }
     Set-TestEnvironment $values
     $stdout = Join-Path $runRoot 'server.stdout.log'
@@ -309,33 +407,82 @@ function Invoke-Browser {
     Invoke-Checked -FilePath $script:npm -Arguments $arguments -Description 'Testes de navegador online/offline'
 }
 
+function Invoke-SimulationBrowser {
+    Set-TestEnvironment @{
+        SGI_BROWSER_OUTPUT_DIR = Join-Path $runRoot 'simulation-browser'
+        SGI_BROWSER_REPORT_DIR = Join-Path $runRoot 'simulation-playwright-report'
+        SGI_BROWSER_JSON_REPORT = Join-Path $runRoot 'simulation-browser-results.json'
+    }
+    $arguments = @('--prefix', (Join-Path $root 'tests/browser'), 'test', '--', '--project=simulation', '--grep', '224 alunos autenticam')
+    Invoke-Checked -FilePath $script:npm -Arguments $arguments -Description 'Portal dos 224 alunos da simulação'
+}
+
+function Invoke-SimulationEventsBrowser {
+    Set-TestEnvironment @{
+        SGI_BROWSER_OUTPUT_DIR = Join-Path $runRoot 'simulation-events-browser'
+        SGI_BROWSER_REPORT_DIR = Join-Path $runRoot 'simulation-events-playwright-report'
+        SGI_BROWSER_JSON_REPORT = Join-Path $runRoot 'simulation-events-browser-results.json'
+    }
+    $arguments = @('--prefix', (Join-Path $root 'tests/browser'), 'test', '--', '--project=simulation', '--grep', 'opera a edição preparada')
+    Invoke-Checked -FilePath $script:npm -Arguments $arguments -Description 'Jogos e provas pelos portais dos mesários'
+}
+
 function Invoke-Visual {
     $arguments = @('--prefix', (Join-Path $root 'tests/browser'), 'test', '--', 'visual-contract.spec.cjs')
     Invoke-Checked -FilePath $script:npm -Arguments $arguments -Description 'Contrato visual'
 }
 
 try {
-    Check-Prerequisites
+    Invoke-RunStage -Name 'prerequisite_check' -Action { Check-Prerequisites }
     if ($requiresDatabase) {
-        Acquire-TestLock
-        $script:dbUser = 'root'
-        $script:dbPassword = 'sgi-test-only'
-        Start-DockerDatabase
-        $script:dbHost = '127.0.0.1'
+        Invoke-RunStage -Name 'database_setup' -Action {
+            Acquire-TestLock
+            $script:dbUser = 'root'
+            $script:dbPassword = 'sgi-test-only'
+            Start-DockerDatabase
+            $script:dbHost = '127.0.0.1'
+        }
     }
 
     if ($Suite -eq 'quality') {
-        Invoke-Quality
+        Invoke-RunStage -Name 'quality' -Action { Invoke-Quality }
     } elseif ($requiresDatabase) {
-        Start-TestServer
-        if ($Suite -eq 'all') { Invoke-Quality }
-        Invoke-Integration
-        if ($Suite -in @('browser', 'all')) { Invoke-Browser }
-        if ($IncludeVisual -or $Suite -eq 'visual') { Invoke-Visual }
+        Invoke-RunStage -Name 'server_setup' -Action { Start-TestServer }
+        if ($Suite -eq 'all') { Invoke-RunStage -Name 'quality' -Action { Invoke-Quality } }
+        Invoke-RunStage -Name 'integration' -Action { Invoke-Integration }
+        if ($needsBrowser) {
+            Invoke-RunStage -Name 'restore_latest_schema' -Action {
+                Invoke-Checked -FilePath $script:php -Arguments @('bin/sgi.php', 'migrate') -Description 'Restaurar migrações atuais após os testes de recuperação'
+            }
+        }
+        if ($Suite -in @('browser', 'all')) {
+            Invoke-RunStage -Name 'browser' -Action { Invoke-Browser }
+        }
+        if ($IncludeVisual -or $Suite -eq 'visual') { Invoke-RunStage -Name 'visual' -Action { Invoke-Visual } }
+        if ($deferSimulation) {
+            Set-TestEnvironment @{
+                SGI_TEST_INTEGRATION_SCENARIO = 'FullInterclasseSimulationTest'
+                SGI_TEST_DEFER_SIMULATION = '0'
+                SGI_SIMULATION_PHASE = 'prepare'
+            }
+            Invoke-RunStage -Name 'simulation_integration' -Action { Invoke-Integration }
+            Invoke-RunStage -Name 'simulation_events_browser' -Action { Invoke-SimulationEventsBrowser }
+            Set-TestEnvironment @{
+                SGI_SIMULATION_PHASE = 'finalize'
+                SGI_TEST_PRESERVE_DATABASE = '1'
+            }
+            Invoke-RunStage -Name 'simulation_reconciliation' -Action { Invoke-Integration }
+            Set-TestEnvironment @{
+                SGI_SIMULATION_PHASE = 'complete'
+                SGI_TEST_PRESERVE_DATABASE = '0'
+            }
+            Invoke-RunStage -Name 'simulation_portal' -Action { Invoke-SimulationBrowser }
+        }
     }
     Write-Host "`nTestes concluídos. Artefatos: $runRoot"
 } catch {
     $exitCode = 1
+    $script:runStatus = 'failed'
     Write-Error $_
 } finally {
     $cleanupActions = @()
@@ -373,7 +520,12 @@ try {
         }
     }
     . (Join-Path $PSScriptRoot 'test-local-cleanup.ps1')
+    $cleanupTimer = [System.Diagnostics.Stopwatch]::StartNew()
     Invoke-TestLocalCleanupActions -Actions $cleanupActions
+    $cleanupTimer.Stop()
+    $script:runSteps.Add([pscustomobject]@{ name = 'cleanup'; started_at_utc = [DateTimeOffset]::UtcNow.AddSeconds(-$cleanupTimer.Elapsed.TotalSeconds).ToString('o'); duration_seconds = [math]::Round($cleanupTimer.Elapsed.TotalSeconds, 3); status = if ($exitCode -eq 0) { 'passed' } else { 'completed_with_prior_failure' }; exit_code = $exitCode })
+    $script:runStatus = if ($exitCode -eq 0) { 'passed' } else { 'failed' }
+    Write-RunManifest
 }
 
 exit $exitCode

@@ -33,6 +33,22 @@ final class InscricaoService
             throw new InvalidArgumentException('Nenhuma equipe válida informada.');
         }
 
-        return $this->inscricoes->subscribe($userId, $editionId, $normalised);
+        $revision = null;
+        if (array_key_exists('cronograma_versao', $data)) {
+            $revision = filter_var($data['cronograma_versao'], FILTER_VALIDATE_INT);
+            if ($revision === false || $revision < 0) {
+                throw new InvalidArgumentException('A revisão do cronograma é inválida.');
+            }
+            $revision = (int) $revision;
+        }
+        $publishedVersion = null;
+        if (array_key_exists('versao_publicada', $data)) {
+            $publishedVersion = filter_var($data['versao_publicada'], FILTER_VALIDATE_INT);
+            if ($publishedVersion === false || $publishedVersion < 0) {
+                throw new InvalidArgumentException('A versão publicada do cronograma é inválida.');
+            }
+            $publishedVersion = (int) $publishedVersion;
+        }
+        return $this->inscricoes->subscribe($userId, $editionId, $normalised, $revision, $publishedVersion);
     }
 }

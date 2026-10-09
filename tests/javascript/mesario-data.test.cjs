@@ -21,6 +21,18 @@ test('rotas v1 preservam cadastros e projetam o encerramento com placar offline'
     assert.deepEqual(Array.from(await layer.read('partidas'), p => p.resultado_partida), [2, 1]);
 });
 
+test('estado do cronograma offline conserva a revisão e sinaliza obsolescência ao reconectar', async () => {
+    const layer = await carregarDataLayer();
+    const url = 'https://sgi.test/api/v1/cronograma?id_interclasse=17';
+    await layer.capture(url, JSON.stringify({ success: true, id_interclasse: 17, cronograma_versao: 4, versao_publicada: 4, operacao_liberada: 1 }));
+    await layer.capture(url, JSON.stringify({ success: true, id_interclasse: 17, cronograma_versao: 5, versao_publicada: 5, operacao_liberada: 0 }));
+    assert.equal((await layer.read('cronograma'))[0].cronograma_versao, 5);
+    assert.equal(layer.__eventos.length, 1);
+    assert.equal(layer.__eventos[0].detail.anterior, 4);
+    assert.equal(layer.__eventos[0].detail.atual, 5);
+    assert.equal(layer.__eventos[0].detail.id_interclasse, '17');
+});
+
 test('ponto offline incrementa a partida e a anulação preserva o histórico do atleta', async () => {
     const layer = await carregarDataLayer();
     await layer.capture('https://sgi.test/api/v1/pontos?acao=atletas&id_jogo=7&id_equipe=1', JSON.stringify({
@@ -166,9 +178,11 @@ function criarIndexedDbFake() {
 }
 
 async function carregarDataLayer() {
-    const window = { SGI_CACHE_KEY: 't11-test' };
+    const eventos = [];
+    const window = { SGI_CACHE_KEY: 't11-test', dispatchEvent: (event) => eventos.push(event) };
     const context = {
         window,
+        CustomEvent: class CustomEvent { constructor(type, init) { this.type = type; this.detail = init.detail; } },
         indexedDB: criarIndexedDbFake(),
         URL,
         Response,
@@ -203,6 +217,7 @@ async function carregarDataLayer() {
         turmas_id_turma: 3,
         descricao_ocorrencia_turma: 'Turma certa',
     });
+    window.SGIDataLayer.__eventos = eventos;
     return window.SGIDataLayer;
 }
 

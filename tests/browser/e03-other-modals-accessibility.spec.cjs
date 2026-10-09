@@ -102,7 +102,7 @@ test('E03 associa a nova categoria ao rótulo visível no modal', async ({ page 
     const criarTurma = page.getByRole('dialog', { name: 'Criar nova Turma' });
     await expect(criarTurma).toBeVisible();
     await expect(criarTurma.getByLabel('Nome da turma:')).toBeVisible();
-    await expect(criarTurma.getByLabel('Selecionar PDF dos alunos')).toHaveAttribute('aria-describedby', 'descricaoArquivoUpload');
+    await expect(criarTurma.getByLabel('Selecionar PDF dos estudantes')).toHaveAttribute('aria-describedby', 'descricaoArquivoUpload');
 });
 
 test('E03 nomeia a edição de modalidade e os campos do jogo', async ({ page }) => {

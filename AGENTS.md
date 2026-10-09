@@ -157,6 +157,19 @@ teste é criado uma vez por execução da suíte, compartilhado pelos cenários
 encadeados e removido ao final. `-Keep`/`--keep` é apenas uma exceção explícita
 para investigação e deixa o ambiente sob responsabilidade de quem o utilizou.
 
+Na suíte Playwright, `database` mantém um worker serial para specs que dependem
+do servidor/banco compartilhado. Somente `bootstrap-components.spec.cjs` e
+`offline-queue-regression.spec.cjs` pertencem ao projeto `independent`, com um
+worker separado e saídas próprias; não amplie essa allowlist sem comprovar que
+os specs não leem nem alteram SQL, sessão ou estado global compartilhado.
+
+Para feedback curto durante a implementação, execute o subconjunto da camada
+alterada (`composer test:unit`, `npm test` ou
+`npm --prefix tests/browser run test:offline-queue`). O último comando seleciona
+somente `offline-queue-regression.spec.cjs`, com IndexedDB real e respostas
+controladas; seu setup sem SQL é fixo nesse atalho. Esses comandos focais não
+substituem o perfil completo exigido para concluir uma mudança funcional.
+
 Para executar somente qualidade, sem banco/servidor:
 
 ```powershell
@@ -165,9 +178,23 @@ powershell -ExecutionPolicy Bypass -File tools/test-local.ps1 -Suite quality
 
 O perfil `all` inclui `composer verify`, build, `npm run check`, `npm test`,
 `tests/run_all.php` dentro do ambiente Docker e testes de navegador. `composer
-verify` reúne PHPUnit, lint PHP, PHPStan e verificação de estilo. O contrato
-visual é adicional: use `-IncludeVisual` quando alterar aparência/layout. O
-executor também oferece os perfis `integration`, `browser` e `visual`.
+verify` reúne PHPUnit, lint PHP, PHPStan e verificação de estilo. O build Docker
+compila os assets da revisão em teste numa camada cacheável. Os specs de
+componentes os carregam pela URL pública da aplicação, portanto a imagem do
+navegador só precisa das dependências Playwright. Alterações apenas de PHP/testes
+reutilizam a camada de assets. O contrato visual é adicional: use
+`-IncludeVisual` quando alterar aparência/layout. O executor também oferece os
+perfis `integration`, `browser` e `visual`; browser e visual executam integração
+antes do Playwright para preparar a base. O perfil browser inclui ranking
+individual.
+
+Os wrappers `test-local.ps1`, `test-docker.ps1` e `test-docker.sh` gravam
+`run-manifest.json` com perfil, revisão, estado do checkout, seleção, duração
+por etapa e código de saída. Playwright grava JSON além do relatório HTML e das
+evidências de falha. A integração grava `integration-timings.json` com a duração
+dos cenários em ordem decrescente. Um retry aprovado continua sendo reportado
+como instável e falha no gate completo. Compare medições com o mesmo perfil,
+separando primeira execução das repetições posteriores.
 
 Alternativa descartável com Docker/Compose em execução:
 
@@ -207,7 +234,7 @@ Consulte `tests/browser/offline-queue-regression.spec.cjs` para regressões da f
 - Não registre senhas, tokens, credenciais, dados pessoais desnecessários, SQL com valores sensíveis ou outros segredos. Logs precisam ser detalhados para diagnóstico sem criar risco de exposição; aplique rotação e retenção compatíveis com o ambiente.
 - Ao entregar uma homologação ou relatar uma falha, informe a URL/ambiente, versão ou commit, comando e horário da execução, cenário reproduzido, resultado esperado, resultado observado e caminhos dos logs relevantes. Não declare funcionamento sem registrar também as limitações e os erros encontrados.
 
-A matriz declarada em `.github/workflows/ci.yml` valida qualidade apenas em PHP 8.4. Integração, navegador e contrato visual usam PHP 8.4 e MariaDB 10.11; o contrato visual usa as referências Linux. PHP 8.2 e MySQL 8.4 continuam disponíveis nos executores locais, mas não fazem parte da validação do CI. Uma execução local não comprova a execução remota do CI.
+A matriz declarada em `.github/workflows/ci.yml` valida qualidade apenas em PHP 8.4. Integração, navegador e contrato visual usam PHP 8.4 e MariaDB 10.11; o contrato visual usa as referências Linux. PHP 8.2 e MySQL 8.4 continuam disponíveis nos executores locais, mas não fazem parte da validação do CI. O CI usa cache remoto BuildKit de camadas de imagem; ele acelera a preparação, não substitui comandos, relatórios ou resultados das suítes. Uma execução local não comprova a execução remota do CI.
 
 Na entrega, informe o que mudou, quais comandos foram executados, seus resultados e limitações. Registre falhas preexistentes e pré-requisitos ausentes sem declarar aprovação. Revise `git diff --check` e o diff final, preserve alterações do usuário e atualize README/guias quando houver mudança de configuração, operação ou contrato.
 

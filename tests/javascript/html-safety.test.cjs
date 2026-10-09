@@ -33,7 +33,6 @@ test('mensagens vindas de APIs são escapadas antes de entrar em innerHTML', () 
         ['resources/js/pages/aluno/perfil.js', /esc\(data\.message \|\| 'Erro ao salvar\.'/],
         ['resources/js/pages/acesso/perfil.js', /esc\(data\.message \|\| 'Erro ao salvar\.'/],
         ['resources/js/pages/acesso/colaboradores.js', /esc\(error\.message\)/],
-        ['resources/js/pages/competicoes/chaveamento.js', /esc\(err\.message\)/],
         ['resources/js/pages/competicoes/modalidade-detalhes.js', /esc\(error\.message\)/],
         ['resources/js/pages/competicoes/placar.js', /esc\(result\.message \|\| 'Erro ao salvar\.'/],
         ['resources/js/pages/eventos/categorias.js', /esc\(err\.message\)/],

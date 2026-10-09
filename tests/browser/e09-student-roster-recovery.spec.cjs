@@ -289,7 +289,7 @@ test.describe('E09 — recuperação de listas e estados vazios', () => {
         await abrirListaDaTurma(page);
         const tabela = page.locator('#tbodyAlunosTurmaDesk');
         await expect(tabela).toContainText(/erro ao carregar|não foi possível carregar/i, { timeout: 5_000 });
-        await expect(tabela).not.toContainText('Nenhum aluno cadastrado nesta turma.');
+        await expect(tabela).not.toContainText('Nenhum estudante cadastrado nesta turma.');
 
         const busca = page.locator('#buscaAlunoDesk');
         await busca.fill('Ana');
@@ -308,12 +308,12 @@ test.describe('E09 — recuperação de listas e estados vazios', () => {
         await abrirListaDaTurma(page);
 
         const tabela = page.locator('#tbodyAlunosTurmaDesk');
-        await expect(tabela).toContainText('Nenhum aluno cadastrado nesta turma.');
+        await expect(tabela).toContainText('Nenhum estudante cadastrado nesta turma.');
         await page.locator('#buscaAlunoDesk').fill('aluna ausente');
         await expect(tabela).toContainText(/nenhum resultado para sua busca/i);
-        await expect(tabela).not.toContainText('Nenhum aluno cadastrado nesta turma.');
+        await expect(tabela).not.toContainText('Nenhum estudante cadastrado nesta turma.');
         await page.locator('#buscaAlunoDesk').fill('');
-        await expect(tabela).toContainText('Nenhum aluno cadastrado nesta turma.');
+        await expect(tabela).toContainText('Nenhum estudante cadastrado nesta turma.');
     });
 
     test('equipe-alunos não apresenta falha HTTP ao consultar competidores como equipe vazia', async ({ page }) => {
@@ -341,6 +341,6 @@ test.describe('E09 — recuperação de listas e estados vazios', () => {
 
         const lista = page.locator('#listaAlunosDesktop');
         await expect(lista).toContainText(/erro ao carregar|não foi possível carregar/i, { timeout: 5_000 });
-        await expect(lista).not.toContainText('Nenhum aluno disponível');
+        await expect(lista).not.toContainText('Nenhum estudante disponível');
     });
 });

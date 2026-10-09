@@ -1,0 +1,7 @@
+# Prompt de execução para Luna
+
+Implemente no checkout atual o [plano de ajustes após homologação visual](README.md), etapas S00–S06. Preserve as alterações preexistentes. O sistema será instalado do zero, sem compatibilidade com versões antigas; mantenha a consistência dos dados e da fila offline produzidos pela versão atual. Não execute testes de banco fora dos runners Docker oficiais.
+
+Comece lendo o [relatório manual](../../test-results-homologacao-visual-20260924/relatorio.md), [diagnóstico](00-diagnostico.md), [contrato](01-contrato.md), [etapas](02-etapas.md), [validação](03-validacao.md) e `AGENTS.md`. Reproduza e capture a causa do logout antes de tratá-la como simples link GET; o cliente atual já tenta POST, mas redireciona mesmo com falha. Crie regressões observáveis para campeão `PL:...:MM:2`, histórico do mesário, duração finita, CSRF/logout e jornada completa. Não enfraqueça o filtro operacional nem a autorização de edição para liberar histórico. Verifique, mas não mude por suposição, a regra do bye de seis equipes. Troca de senha está fora do escopo visual solicitado.
+
+Execute testes focais, gate completo MariaDB com visual e, se houver SQL/schema, integração MySQL. Abra a aplicação no navegador integrado ou Chrome, repita os fluxos autorizados e salve prints e logs sem segredos. Atualize [STATUS](STATUS.md) com comandos, horários, resultados, run IDs e limitações reais. Entregue código, testes e evidências; não faça push, merge ou deploy.

@@ -6,6 +6,7 @@ namespace App\Modules\Competicoes\Infrastructure;
 
 use App\Modules\Competicoes\Domain\ModalidadeRepository;
 use App\Modules\Competicoes\Domain\ModalidadeScopeRules;
+use App\Modules\Competicoes\Domain\CronogramaRules;
 use App\Shared\Database\Transaction;
 use InvalidArgumentException;
 use mysqli;
@@ -80,6 +81,25 @@ final class MysqliModalidadeRepository implements ModalidadeRepository
         }
         $rows = $statement->get_result()->fetch_all(MYSQLI_ASSOC);
         $statement->close();
+        if ($rows !== [] && $this->planningTableExists()) {
+            $ids = array_map(static fn (array $row): int => (int) $row['id_modalidade'], $rows);
+            $marks = implode(',', array_fill(0, count($ids), '?'));
+            $meta = $this->connection->prepare('SELECT id_modalidade, equipes_planejadas, min_inscritos_equipe, max_inscritos_equipe, formato_participacao, duracao_prevista_min, descanso_min FROM modalidade_planejamentos WHERE id_modalidade IN (' . $marks . ')');
+            if ($meta !== false) {
+                $meta->bind_param(str_repeat('i', count($ids)), ...$ids);
+                if ($meta->execute()) {
+                    $planning = [];
+                    foreach ($meta->get_result()->fetch_all(MYSQLI_ASSOC) as $config) {
+                        $planning[(int) $config['id_modalidade']] = $config;
+                    }
+                    foreach ($rows as &$row) {
+                        $row = array_merge($row, $planning[(int) $row['id_modalidade']] ?? []);
+                    }
+                    unset($row);
+                }
+                $meta->close();
+            }
+        }
         return array_map(static function (array $row): array {
             $row['tipo_competicao'] = \App\Modules\Competicoes\Domain\TipoCompeticaoRules::resolve($row);
             return $row;
@@ -93,6 +113,12 @@ final class MysqliModalidadeRepository implements ModalidadeRepository
             $categoryId = (int) $data['categorias_id_categoria'];
             $interclasseId = (int) $data['interclasses_id_interclasse'];
             $this->lockEditions([$interclasseId]);
+            $planning = $this->planningTableExists()
+                ? $this->one('SELECT cronograma_versao, operacao_liberada FROM interclasse_planejamentos WHERE id_interclasse = ? LIMIT 1 FOR UPDATE', 'i', [$interclasseId])
+                : null;
+            if ($planning !== null && (int) $planning['operacao_liberada'] === 1) {
+                throw new InvalidArgumentException('Não é possível adicionar modalidades depois que a competição foi liberada.');
+            }
             $categories = $this->lockCategories([$categoryId]);
             ModalidadeScopeRules::assertCategoryMatchesEdition(
                 (int) $categories[$categoryId]['interclasses_id_interclasse'],
@@ -121,6 +147,15 @@ final class MysqliModalidadeRepository implements ModalidadeRepository
             }
             $id = (int) $this->connection->insert_id;
             $statement->close();
+            if (array_key_exists('equipes_planejadas', $data)) {
+                $this->savePlanning($id, $data);
+            }
+            if ($planning !== null) {
+                $currentPlanning = $this->one('SELECT cronograma_versao FROM interclasse_planejamentos WHERE id_interclasse = ? LIMIT 1 FOR UPDATE', 'i', [$interclasseId]);
+                if ($currentPlanning !== null && (int) $currentPlanning['cronograma_versao'] === (int) $planning['cronograma_versao']) {
+                    $this->invalidatePlanning($interclasseId);
+                }
+            }
             Transaction::commit($this->connection);
             return $id;
         } catch (\Throwable $exception) {
@@ -141,6 +176,80 @@ final class MysqliModalidadeRepository implements ModalidadeRepository
     /** @param array<string, mixed> $data */
     private function persistUpdates(int $id, array $data): bool
     {
+        Transaction::begin($this->connection);
+        try {
+            $scope = $this->one('SELECT interclasses_id_interclasse FROM modalidades WHERE id_modalidade = ? LIMIT 1', 'i', [$id]);
+            if ($scope === null) {
+                Transaction::rollback($this->connection);
+                return false;
+            }
+            $editionId = (int) $scope['interclasses_id_interclasse'];
+            $planning = $this->planningTableExists()
+                ? $this->one('SELECT cronograma_status, cronograma_versao, operacao_liberada FROM interclasse_planejamentos WHERE id_interclasse = ? LIMIT 1 FOR UPDATE', 'i', [$editionId])
+                : null;
+            $structuralFields = [
+                'genero_modalidade', 'max_inscrito_modalidade', 'max_equipes',
+                'status_modalidade', 'tipos_modalidades_id_tipo_modalidade',
+                'categorias_id_categoria', 'interclasses_id_interclasse',
+                'equipes_planejadas', 'min_inscritos_equipe',
+                'max_inscritos_equipe', 'formato_participacao',
+                'duracao_prevista_min', 'descanso_min',
+            ];
+            $requestedStructuralFields = array_intersect($structuralFields, array_keys($data));
+            $structuralChanged = false;
+            if ($requestedStructuralFields !== []) {
+                $planningFields = $this->planningTableExists();
+                $planningColumns = $planningFields
+                    ? ', mp.equipes_planejadas, mp.min_inscritos_equipe, mp.max_inscritos_equipe, mp.formato_participacao, mp.duracao_prevista_min, mp.descanso_min'
+                    : '';
+                $planningJoin = $planningFields ? ' LEFT JOIN modalidade_planejamentos mp ON mp.id_modalidade = m.id_modalidade' : '';
+                $current = $this->one(
+                    'SELECT m.genero_modalidade, m.max_inscrito_modalidade, m.max_equipes, m.status_modalidade, m.tipos_modalidades_id_tipo_modalidade, m.categorias_id_categoria, m.interclasses_id_interclasse' . $planningColumns . ' FROM modalidades m' . $planningJoin . ' WHERE m.id_modalidade = ? LIMIT 1 FOR UPDATE',
+                    'i',
+                    [$id],
+                );
+                if ($current === null) {
+                    throw new InvalidArgumentException('Modalidade não encontrada.');
+                }
+                foreach ($requestedStructuralFields as $field) {
+                    $before = $current[$field] ?? null;
+                    $after = $data[$field] ?? null;
+                    if ($field === 'duracao_prevista_min') {
+                        $before = $before === null || $before === '' ? null : (int) $before;
+                        $after = $after === null || $after === '' ? null : (int) $after;
+                        $structuralChanged = $before !== $after;
+                    } elseif (in_array($field, ['formato_participacao', 'genero_modalidade', 'status_modalidade'], true)) {
+                        $structuralChanged = (string) $before !== (string) $after;
+                    } else {
+                        $structuralChanged = (int) ($before ?? 0) !== (int) ($after ?? 0);
+                    }
+                    if ($structuralChanged) {
+                        break;
+                    }
+                }
+            }
+            if ($planning !== null && (int) $planning['operacao_liberada'] === 1 && $structuralChanged) {
+                throw new InvalidArgumentException('A configuração das modalidades não pode mudar depois que a competição foi liberada.');
+            }
+            $revisionBefore = $planning === null ? null : (int) $planning['cronograma_versao'];
+            $updated = $this->persistUpdatesLocked($id, $data);
+            if ($structuralChanged && $planning !== null && (int) $planning['operacao_liberada'] === 0) {
+                $currentRevision = $this->one('SELECT cronograma_versao FROM interclasse_planejamentos WHERE id_interclasse = ? LIMIT 1 FOR UPDATE', 'i', [$editionId]);
+                if ($currentRevision !== null && (int) $currentRevision['cronograma_versao'] === $revisionBefore) {
+                    $this->invalidatePlanning($editionId);
+                }
+            }
+            Transaction::commit($this->connection);
+            return $updated;
+        } catch (\Throwable $exception) {
+            Transaction::rollback($this->connection);
+            throw $exception;
+        }
+    }
+
+    /** @param array<string, mixed> $data */
+    private function persistUpdatesLocked(int $id, array $data): bool
+    {
         $fields = [];
         $values = [];
         $types = '';
@@ -152,6 +261,9 @@ final class MysqliModalidadeRepository implements ModalidadeRepository
             }
         }
         if ($fields === []) {
+            if (array_intersect(['equipes_planejadas', 'min_inscritos_equipe', 'max_inscritos_equipe', 'formato_participacao', 'duracao_prevista_min', 'descanso_min'], array_keys($data)) !== []) {
+                return $this->savePlanning($id, $data);
+            }
             throw new RuntimeException('Nenhum campo válido para atualizar.');
         }
         $values[] = $id;
@@ -176,7 +288,119 @@ final class MysqliModalidadeRepository implements ModalidadeRepository
             }
         }
         $statement->close();
+        if (array_intersect(['equipes_planejadas', 'min_inscritos_equipe', 'max_inscritos_equipe', 'formato_participacao', 'duracao_prevista_min', 'descanso_min'], array_keys($data)) !== []) {
+            $this->savePlanning($id, $data);
+        }
         return $found;
+    }
+
+    /** @param array<string,mixed> $data */
+    private function savePlanning(int $modalityId, array $data): bool
+    {
+        if (!$this->planningTableExists()) {
+            throw new RuntimeException('A migration do cronograma planejado ainda não foi aplicada.');
+        }
+        $existing = null;
+        $read = $this->connection->prepare('SELECT m.interclasses_id_interclasse, mp.equipes_planejadas, mp.min_inscritos_equipe, mp.max_inscritos_equipe, mp.formato_participacao, mp.duracao_prevista_min, mp.descanso_min, m.max_inscrito_modalidade FROM modalidades m LEFT JOIN modalidade_planejamentos mp ON mp.id_modalidade = m.id_modalidade WHERE m.id_modalidade = ? LIMIT 1 FOR UPDATE');
+        if ($read !== false) {
+            $read->bind_param('i', $modalityId);
+            if ($read->execute()) {
+                $existing = $read->get_result()->fetch_assoc() ?: null;
+            }
+            $read->close();
+        }
+        if ($existing === null) {
+            throw new RuntimeException('Modalidade não encontrada.');
+        }
+        $config = CronogramaRules::modalidade([
+            'equipes_planejadas' => $data['equipes_planejadas'] ?? $existing['equipes_planejadas'],
+            'min_inscritos_equipe' => $data['min_inscritos_equipe'] ?? ($existing['min_inscritos_equipe'] ?? 1),
+            'max_inscritos_equipe' => $data['max_inscritos_equipe'] ?? ($existing['max_inscritos_equipe'] ?? ($existing['max_inscrito_modalidade'] ?? 1)),
+            'formato_participacao' => $data['formato_participacao'] ?? ($existing['formato_participacao'] ?? 'equipe'),
+            'duracao_prevista_min' => array_key_exists('duracao_prevista_min', $data) ? $data['duracao_prevista_min'] : ($existing['duracao_prevista_min'] ?? null),
+            'descanso_min' => $data['descanso_min'] ?? ($existing['descanso_min'] ?? 0),
+            'max_inscrito_modalidade' => $existing['max_inscrito_modalidade'] ?? 1,
+        ]);
+        $quantity = $config['quantidade'];
+        $min = $config['min'];
+        $max = $config['max'];
+        $format = $config['formato'];
+        $duration = $config['duracao'];
+        $rest = $config['descanso'];
+        $samePlanning = $existing['equipes_planejadas'] !== null
+            && (int) $existing['equipes_planejadas'] === $quantity
+            && (int) $existing['min_inscritos_equipe'] === $min
+            && (int) $existing['max_inscritos_equipe'] === $max
+            && (string) $existing['formato_participacao'] === $format
+            && ($existing['duracao_prevista_min'] === null ? null : (int) $existing['duracao_prevista_min']) === $duration
+            && (int) $existing['descanso_min'] === $rest;
+        $editionId = (int) $existing['interclasses_id_interclasse'];
+        $edition = $this->one('SELECT cronograma_status, cronograma_versao, operacao_liberada FROM interclasse_planejamentos WHERE id_interclasse = ? LIMIT 1 FOR UPDATE', 'i', [$editionId]);
+        if ($edition !== null && (int) $edition['operacao_liberada'] === 1 && !$samePlanning) {
+            throw new InvalidArgumentException('O planejamento não pode ser alterado depois que a competição foi liberada.');
+        }
+        if ($samePlanning) {
+            return true;
+        }
+        $statement = $this->connection->prepare('INSERT INTO modalidade_planejamentos (id_modalidade, equipes_planejadas, min_inscritos_equipe, max_inscritos_equipe, formato_participacao, duracao_prevista_min, descanso_min) VALUES (?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE equipes_planejadas = VALUES(equipes_planejadas), min_inscritos_equipe = VALUES(min_inscritos_equipe), max_inscritos_equipe = VALUES(max_inscritos_equipe), formato_participacao = VALUES(formato_participacao), duracao_prevista_min = VALUES(duracao_prevista_min), descanso_min = VALUES(descanso_min)');
+        if ($statement === false) {
+            throw new RuntimeException('A migration do cronograma planejado ainda não foi aplicada.');
+        }
+        $statement->bind_param('iiiisii', $modalityId, $quantity, $min, $max, $format, $duration, $rest);
+        if (!$statement->execute()) {
+            $statement->close();
+            throw new RuntimeException('Não foi possível salvar o planejamento da modalidade.');
+        }
+        $statement->close();
+        if ($edition !== null) {
+            $this->invalidatePlanning($editionId);
+        }
+        return true;
+    }
+
+    private function planningTableExists(): bool
+    {
+        $result = $this->connection->query("SELECT COUNT(*) AS total FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'modalidade_planejamentos'");
+        if ($result === false) {
+            return false;
+        }
+        $row = $result->fetch_assoc();
+        $result->free();
+        return (int) ($row['total'] ?? 0) > 0;
+    }
+
+    /** @param list<mixed> $values @return array<string,mixed>|null */
+    private function one(string $sql, string $types, array $values): ?array
+    {
+        $statement = $this->connection->prepare($sql);
+        if ($statement === false) {
+            throw new RuntimeException('Não foi possível preparar a consulta da modalidade.');
+        }
+        if ($types !== '') {
+            $statement->bind_param($types, ...$values);
+        }
+        if (!$statement->execute()) {
+            $statement->close();
+            throw new RuntimeException('Não foi possível consultar os dados da modalidade.');
+        }
+        $row = $statement->get_result()->fetch_assoc();
+        $statement->close();
+
+        return $row === null ? null : $row;
+    }
+
+    private function invalidatePlanning(int $editionId): void
+    {
+        $statement = $this->connection->prepare("UPDATE interclasse_planejamentos SET inscricoes_status = IF(cronograma_status = 'publicado', 'fechadas', inscricoes_status), cronograma_status = IF(cronograma_status = 'publicado', 'revisao', cronograma_status), cronograma_versao = cronograma_versao + 1 WHERE id_interclasse = ? AND operacao_liberada = 0");
+        if ($statement === false) {
+            throw new RuntimeException('Não foi possível invalidar a proposta do cronograma.');
+        }
+        $statement->bind_param('i', $editionId);
+        if (!$statement->execute() || $statement->affected_rows !== 1) {
+            $statement->close();
+            throw new RuntimeException('Não foi possível invalidar a proposta do cronograma.');
+        }
+        $statement->close();
     }
 
     /** @param array<string, mixed> $data */
@@ -208,15 +432,40 @@ final class MysqliModalidadeRepository implements ModalidadeRepository
                 $targetEditionId,
                 (string) $categories[$targetCategoryId]['status_categoria'],
             );
-            $hasRelatedData = $current['interclasses_id_interclasse'] !== $targetEditionId
-                && $this->hasRelatedData($id);
+            $scopeChanged = $targetCategoryId !== (int) $initial['categorias_id_categoria']
+                || $targetEditionId !== (int) $initial['interclasses_id_interclasse'];
+            $hasRelatedData = $scopeChanged && $this->hasRelatedData($id);
             ModalidadeScopeRules::assertEditionTransferAllowed(
                 $current['interclasses_id_interclasse'],
                 $targetEditionId,
                 $hasRelatedData,
             );
+            if ((int) $current['categorias_id_categoria'] !== $targetCategoryId && $hasRelatedData) {
+                throw new InvalidArgumentException('Não é possível trocar a categoria de uma modalidade que já possui equipes, inscrições, jogos ou reservas vinculados.');
+            }
+
+            $planningRevisions = [];
+            if ($scopeChanged && $this->planningTableExists()) {
+                $editionIds = array_values(array_unique([(int) $initial['interclasses_id_interclasse'], $targetEditionId]));
+                sort($editionIds, SORT_NUMERIC);
+                foreach ($editionIds as $editionId) {
+                    $planning = $this->one('SELECT cronograma_versao, operacao_liberada FROM interclasse_planejamentos WHERE id_interclasse = ? LIMIT 1 FOR UPDATE', 'i', [$editionId]);
+                    if ($planning !== null && (int) $planning['operacao_liberada'] === 1) {
+                        throw new InvalidArgumentException('A modalidade não pode trocar de categoria ou edição depois que a competição foi liberada.');
+                    }
+                    if ($planning !== null) {
+                        $planningRevisions[$editionId] = (int) $planning['cronograma_versao'];
+                    }
+                }
+            }
 
             $updated = $this->persistUpdates($id, $data);
+            foreach ($planningRevisions as $editionId => $revision) {
+                $currentRevision = $this->one('SELECT cronograma_versao FROM interclasse_planejamentos WHERE id_interclasse = ? LIMIT 1 FOR UPDATE', 'i', [$editionId]);
+                if ($currentRevision !== null && (int) $currentRevision['cronograma_versao'] === $revision) {
+                    $this->invalidatePlanning((int) $editionId);
+                }
+            }
             Transaction::commit($this->connection);
             return $updated;
         } catch (\Throwable $exception) {
@@ -347,8 +596,20 @@ final class MysqliModalidadeRepository implements ModalidadeRepository
 
     public function deactivate(int $id): bool
     {
-        $this->connection->begin_transaction();
+        Transaction::begin($this->connection);
         try {
+            $scope = $this->one('SELECT interclasses_id_interclasse FROM modalidades WHERE id_modalidade = ? LIMIT 1', 'i', [$id]);
+            if ($scope === null) {
+                Transaction::rollback($this->connection);
+                return false;
+            }
+            $editionId = (int) $scope['interclasses_id_interclasse'];
+            $planning = $this->planningTableExists()
+                ? $this->one('SELECT cronograma_status, operacao_liberada FROM interclasse_planejamentos WHERE id_interclasse = ? LIMIT 1 FOR UPDATE', 'i', [$editionId])
+                : null;
+            if ($planning !== null && (int) $planning['operacao_liberada'] === 1) {
+                throw new InvalidArgumentException('Não é possível desativar modalidades depois que a competição foi liberada.');
+            }
             $modalidade = $this->connection->prepare("UPDATE modalidades SET status_modalidade = '0' WHERE id_modalidade = ?");
             $equipes = $this->connection->prepare("UPDATE equipes SET status_equipe = '0' WHERE modalidades_id_modalidade = ?");
             if ($modalidade === false || $equipes === false) {
@@ -365,13 +626,18 @@ final class MysqliModalidadeRepository implements ModalidadeRepository
                 throw new RuntimeException('Não foi possível excluir modalidade.');
             }
             $found = $modalidade->affected_rows > 0;
+            $changed = $found;
             $equipes->bind_param('i', $id);
             if (!$equipes->execute()) {
                 throw new RuntimeException('Não foi possível desativar equipes.');
             }
+            $changed = $changed || $equipes->affected_rows > 0;
             $modalidade->close();
             $equipes->close();
-            $this->connection->commit();
+            if ($planning !== null && $changed) {
+                $this->invalidatePlanning($editionId);
+            }
+            Transaction::commit($this->connection);
             if (!$found) {
                 $check = $this->connection->prepare('SELECT 1 FROM modalidades WHERE id_modalidade = ?');
                 if ($check !== false) {
@@ -383,7 +649,7 @@ final class MysqliModalidadeRepository implements ModalidadeRepository
             }
             return $found;
         } catch (\Throwable $exception) {
-            $this->connection->rollback();
+            Transaction::rollback($this->connection);
             throw $exception;
         }
     }

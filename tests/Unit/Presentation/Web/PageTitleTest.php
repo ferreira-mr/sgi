@@ -64,16 +64,20 @@ final class PageTitleTest extends TestCase
 
     public function testClientNavigationKeepsTheCanonicalTitle(): void
     {
-        $adminHeader = file_get_contents($this->path('resources/views/components/admin-header.php'));
+        $adminHead = file_get_contents($this->path('resources/views/components/admin-head.php'));
+        $interclasseService = file_get_contents($this->path('resources/js/shared/interclasse-service.js'));
         $turmaAlunos = file_get_contents($this->path('resources/js/pages/participantes/turma-alunos.js'));
         $offline = file_get_contents($this->path('resources/js/offline/mesario-offline.js'));
 
-        self::assertIsString($adminHeader);
+        self::assertIsString($adminHead);
+        self::assertIsString($interclasseService);
         self::assertIsString($turmaAlunos);
         self::assertIsString($offline);
-        self::assertStringContainsString('const tituloPagina = String(metaTituloPagina', $adminHeader);
-        self::assertStringContainsString("tituloPagina + ' | SGI'", $adminHeader);
+        self::assertStringContainsString('js/shared/interclasse-service.js', $adminHead);
+        self::assertStringContainsString('const tituloPagina = String(metaTituloPagina', $interclasseService);
+        self::assertStringContainsString("tituloPagina + ' | SGI'", $interclasseService);
         self::assertStringNotContainsString('SGI - Alunos da Turma', $turmaAlunos);
+        self::assertStringNotContainsString('SGI - Estudantes da turma', $turmaAlunos);
         self::assertStringNotContainsString('document.title = TELA_TITULO', $offline);
         self::assertStringContainsString('document.title = tituloDocumento(rec.titulo, TELA_TITULO[tela]);', $offline);
     }

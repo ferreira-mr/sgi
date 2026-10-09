@@ -45,6 +45,20 @@ final class TestDatabase
         $connection->close();
     }
 
+    public static function assertExistingDisposableDatabase(string $databaseName): void
+    {
+        require_once dirname(__DIR__, 2) . '/bootstrap/autoload.php';
+        self::assertDisposableContainerRuntime();
+        self::assertSafeDatabaseName($databaseName);
+        $server = (new TestClient())->get('api/v1/health');
+        if (($server['json']['test_environment']['database'] ?? null) !== $databaseName) {
+            throw new RuntimeException('O servidor HTTP não confirmou o banco descartável esperado. Nenhum dado foi alterado.');
+        }
+        if (($server['json']['test_environment']['database_runtime'] ?? null) !== 'container') {
+            throw new RuntimeException('O servidor HTTP não confirmou um banco em container. Nenhum dado foi alterado.');
+        }
+    }
+
     public static function connect(?string $database = null): mysqli
     {
         self::assertDisposableContainerRuntime();

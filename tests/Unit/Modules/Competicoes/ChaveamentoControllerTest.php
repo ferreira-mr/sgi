@@ -64,4 +64,35 @@ final class ChaveamentoControllerTest extends TestCase
         self::assertSame(403, $response->status());
         self::assertStringContainsString('não podem preparar', $response->body());
     }
+
+    public function testPedidoLegadoDeGeracaoDeChaveamentoRetornaContratoEstavelSemPersistir(): void
+    {
+        $_SESSION = ['nivel' => 0, 'id_usuario' => 4];
+        $management = $this->createMock(ChaveamentoManagement::class);
+        $management->expects(self::exactly(2))->method('modality')->with(22)->willReturn([
+            'interclasses_id_interclasse' => 10,
+            'tipos_modalidades_id_tipo_modalidade' => 4,
+            'nome_tipo_modalidade' => 'Mata-Mata',
+        ]);
+        $management->expects(self::never())->method('saveIndividual');
+
+        $editions = $this->createMock(InterclasseRepository::class);
+        $controller = new ChaveamentoController(
+            new ChaveamentoService($management),
+            new CompetitionAccess($editions),
+        );
+        $response = $controller(new Request(
+            'POST',
+            '/api/v1/chaveamentos',
+            [],
+            [],
+            [],
+            [],
+            [],
+            '{"id_modalidade":22,"tipo_modalidade":"mata_mata","acao":"gerar"}',
+        ));
+
+        self::assertSame(409, $response->status());
+        self::assertStringContainsString('CHAVEAMENTO_DEVE_VIR_DO_CRONOGRAMA', $response->body());
+    }
 }

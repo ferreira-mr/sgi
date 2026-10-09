@@ -6,9 +6,9 @@
     if (window.__SGI_MESARIO_DATA__) return;
     window.__SGI_MESARIO_DATA__ = true;
 
-    var DB = 'sgi_mesario_dados', VERSION = 2;
+    var DB = 'sgi_mesario_dados', VERSION = 3;
     var STORES = ['jogos', 'partidas', 'atletas', 'turmas', 'modalidades', 'categorias', 'locais', 'equipes',
-        'ocorrencias', 'ocorrencias_turmas', 'chaveamentos', 'pontos', 'fila_sincronizacao'];
+        'ocorrencias', 'ocorrencias_turmas', 'chaveamentos', 'pontos', 'cronograma', 'fila_sincronizacao'];
     // Namespace opaco por usuário; não usar o ID persistente diretamente.
     var session = String(window.SGI_CACHE_KEY || 'anon');
     var dbPromise;
@@ -74,7 +74,8 @@
                 'ocorrencias-turmas': 'ocorrencias_turmas',
                 'artilheiros': 'artilheiros',
                 'pontos': 'pontos',
-                'chaveamentos': 'chaveamentos'
+                'chaveamentos': 'chaveamentos',
+                'cronograma': 'cronograma'
             };
             return { file: recursos[file] || file, q: u.searchParams };
         } catch (_) { return {}; }
@@ -96,9 +97,24 @@
         var isAtletasPontos = file === 'pontos' && action === 'atletas';
         var store = (isAtletasPontos || isAtletasOcorrencias)
             ? 'atletas'
-            : ({ 'jogos': 'jogos', 'partidas': 'partidas', 'turmas': 'turmas', 'modalidades': 'modalidades', 'categorias': 'categorias', 'locais': 'locais', 'equipes': 'equipes', 'artilheiros': 'atletas', 'pontos': 'pontos', 'ocorrencias': 'ocorrencias', 'ocorrencias_turmas': 'ocorrencias_turmas', 'chaveamentos': 'chaveamentos' }[file]);
+            : ({ 'jogos': 'jogos', 'partidas': 'partidas', 'turmas': 'turmas', 'modalidades': 'modalidades', 'categorias': 'categorias', 'locais': 'locais', 'equipes': 'equipes', 'artilheiros': 'atletas', 'pontos': 'pontos', 'ocorrencias': 'ocorrencias', 'ocorrencias_turmas': 'ocorrencias_turmas', 'chaveamentos': 'chaveamentos', 'cronograma': 'cronograma' }[file]);
         if (!store) return Promise.resolve();
         if (!Array.isArray(rows)) rows = [data];
+        if (store === 'cronograma') {
+            var snapshot = rows[0];
+            var editionId = info.q && info.q.get('id_interclasse') || (snapshot && snapshot.id_interclasse);
+            if (!snapshot || !editionId) return Promise.resolve();
+            return get('cronograma', editionId).then(function (previous) {
+                var oldVersion = previous && (previous.cronograma_versao ?? previous.versao_publicada);
+                var newVersion = snapshot.cronograma_versao ?? snapshot.versao_publicada;
+                if (oldVersion !== undefined && newVersion !== undefined && String(oldVersion) !== String(newVersion) && typeof window !== 'undefined') {
+                    try {
+                        window.dispatchEvent(new CustomEvent('sgi:cronograma-revisado', { detail: { anterior: oldVersion, atual: newVersion, id_interclasse: editionId } }));
+                    } catch (_) {}
+                }
+                return put('cronograma', editionId, snapshot);
+            });
+        }
         return Promise.all(rows.filter(function (r) { return r && typeof r === 'object'; }).map(function (r, i) {
             var identity;
             if (isAtletasPontos) {
@@ -436,10 +452,18 @@
         });
     }
     function localGet(url) {
-        var info = urlInfo(url), file = info.file, store = { 'jogos': 'jogos', 'partidas': 'partidas', 'turmas': 'turmas', 'modalidades': 'modalidades', 'categorias': 'categorias', 'locais': 'locais', 'equipes': 'equipes', 'artilheiros': 'atletas', 'pontos': 'pontos', 'ocorrencias': 'ocorrencias', 'ocorrencias_turmas': 'ocorrencias_turmas', 'chaveamentos': 'chaveamentos' }[file];
+        var info = urlInfo(url), file = info.file, store = { 'jogos': 'jogos', 'partidas': 'partidas', 'turmas': 'turmas', 'modalidades': 'modalidades', 'categorias': 'categorias', 'locais': 'locais', 'equipes': 'equipes', 'artilheiros': 'atletas', 'pontos': 'pontos', 'ocorrencias': 'ocorrencias', 'ocorrencias_turmas': 'ocorrencias_turmas', 'chaveamentos': 'chaveamentos', 'cronograma': 'cronograma' }[file];
         // Endpoints com "acao" possuem formatos especiais; o cache por URL
         // da camada base preserva exatamente a resposta original nesses casos.
         if (!store) return Promise.resolve(null);
+        if (file === 'cronograma') {
+            var edition = String(info.q.get('id_interclasse') || '');
+            return all('cronograma').then(function (rows) {
+                return new Response(JSON.stringify(rows.filter(function (row) {
+                    return !edition || String(row.id_interclasse || '') === edition;
+                })[0] || { success: false, message: 'Cronograma não preparado para esta edição.' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+            });
+        }
         if (file === 'artilheiros' && info.q.get('acao')) return Promise.resolve(null);
         if (file === 'artilheiros') return localArtilharia(url);
         if (file === 'chaveamentos' && ['participantes', 'ranking'].indexOf(info.q.get('acao')) !== -1) {

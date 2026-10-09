@@ -13,21 +13,20 @@ final class ChaveamentoServiceTest extends TestCase
     public function testRejectsMissingModalityBeforePersistence(): void
     {
         $repository = $this->createMock(ChaveamentoManagement::class);
-        $repository->expects(self::never())->method('createBracket');
         $this->expectException(\InvalidArgumentException::class);
         (new ChaveamentoService($repository))->gerar(0, false, null);
     }
 
-    public function testActualIndividualTypeSchedulesWithoutCreatingKnockoutGames(): void
+    public function testIndividualPreparationMustComeFromThePublishedSchedule(): void
     {
         $repository = $this->createMock(ChaveamentoManagement::class);
         $repository->method('modality')->with(7)->willReturn([
             'tipos_modalidades_id_tipo_modalidade' => 37,
             'nome_tipo_modalidade' => 'Individual',
         ]);
-        $repository->expects(self::never())->method('createBracket');
-        $repository->expects(self::once())->method('saveIndividual')->with(7, null)->willReturn(['success' => true]);
-        self::assertTrue((new ChaveamentoService($repository))->gerar(7, false, null)['success']);
+        $repository->expects(self::never())->method('saveIndividual');
+        $this->expectException(\InvalidArgumentException::class);
+        (new ChaveamentoService($repository))->gerar(7, false, null);
     }
 
     public function testIndividualTypeUsesSemanticNameEvenWhenForeignKeyIsNotTwo(): void
@@ -37,10 +36,21 @@ final class ChaveamentoServiceTest extends TestCase
             'tipos_modalidades_id_tipo_modalidade' => 37,
             'nome_tipo_modalidade' => 'Individual',
         ]);
-        $repository->expects(self::never())->method('createBracket');
-        $repository->expects(self::once())->method('saveIndividual')->with(17, null)->willReturn(['success' => true]);
+        $repository->expects(self::never())->method('saveIndividual');
+        $this->expectException(\InvalidArgumentException::class);
+        (new ChaveamentoService($repository))->gerar(17, false, null);
+    }
 
-        self::assertTrue((new ChaveamentoService($repository))->gerar(17, false, null)['success']);
+    public function testTeamBracketGenerationIsRejectedAndDoesNotReachPersistence(): void
+    {
+        $repository = $this->createMock(ChaveamentoManagement::class);
+        $repository->method('modality')->with(22)->willReturn([
+            'tipos_modalidades_id_tipo_modalidade' => 4,
+            'nome_tipo_modalidade' => 'Mata-Mata',
+        ]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        (new ChaveamentoService($repository))->gerar(22, false, null);
     }
 
     public function testNormalizesIndividualPodiumIdentifiers(): void

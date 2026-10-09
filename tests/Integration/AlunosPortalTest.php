@@ -112,6 +112,13 @@ class AlunosPortalTest
         // 8.1 Aceitar termos de participação
         $resAceite = $aluno->postJson('api/v1/termos', []);
         Assertions::assert("Aceite digital de termos de participação esportiva", ($resAceite['json']['success'] ?? false) === true);
+        Assertions::assertStatus(
+            'Aluno com termos aceitos não pode alterar o cronograma',
+            $aluno->postJson('api/v1/cronograma', ['acao' => 'preparar_equipes', 'id_interclasse' => 1]),
+            403,
+        );
+        $cronogramaOutraEdicao = $aluno->get('api/v1/cronograma?id_interclasse=999999');
+        Assertions::assertStatus('Aluno não consulta cronograma de outra edição', $cronogramaOutraEdicao, 403);
 
         $resAceiteRepetido = $aluno->postJson('api/v1/termos', []);
         Assertions::assertJsonSuccess('Reenvio do aceite permanece idempotente', $resAceiteRepetido);

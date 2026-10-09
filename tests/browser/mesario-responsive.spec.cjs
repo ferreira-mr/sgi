@@ -1,5 +1,9 @@
 const { test, expect } = require('./fixtures.cjs');
-const { agendarBloco } = require('./agenda-helper.cjs');
+const {
+    buscarPrimeiroJogoPlanejado,
+    garantirCronogramaPublicado,
+    garantirOperacaoLiberada,
+} = require('./cronograma-fixture-helper.cjs');
 
 const COMPACT_VIEWPORTS = [
     { width: 640, height: 360 },
@@ -23,58 +27,6 @@ async function entrarMesario(page) {
     await form.locator('.ipt-senha').fill('123');
     await form.locator('button[type="submit"]').click();
     await page.waitForURL(/painel\?id=\d+/, { waitUntil: 'domcontentloaded' });
-}
-
-async function criarJogoResponsivo(request, idInterclasse) {
-    const login = await request.post('api/v1/login', {
-        data: { matricula: 'admin', senha: '123' },
-    });
-    if (!login.ok()) throw new Error(`login de preparação: HTTP ${login.status()}`);
-
-    const [modalidadesResponse, equipesResponse] = await Promise.all([
-        request.get(`api/v1/modalidades?id_interclasse=${idInterclasse}`),
-        request.get(`api/v1/equipes?id_interclasse=${idInterclasse}`),
-    ]);
-    const modalidades = await modalidadesResponse.json();
-    const equipes = await equipesResponse.json();
-    const modalidade = (Array.isArray(modalidades) ? modalidades : []).find((item) =>
-        String(item.nome_tipo_modalidade || '').toLowerCase().includes('mata')
-    );
-    if (!modalidade) throw new Error('fixture responsivo sem modalidade coletiva');
-    const equipesDaModalidade = (Array.isArray(equipes) ? equipes : []).filter((item) =>
-        String(item.modalidades_id_modalidade) === String(modalidade.id_modalidade)
-    );
-    if (equipesDaModalidade.length < 2) throw new Error('fixture responsivo sem duas equipes');
-
-    const nomeJogo = `RESP-${Date.now()}`;
-    const sincronizacao = await request.post('api/v1/sincronizacao/chaveamento', {
-        data: {
-            id_modalidade: Number(modalidade.id_modalidade),
-            tipo_modalidade: 'mata_mata',
-            jogos: [{
-                nome_jogo: nomeJogo,
-                status_jogo: 'Agendado',
-                partidas: equipesDaModalidade.slice(0, 2).map((item) => ({
-                    id_equipe: Number(item.id_equipe),
-                    resultado: 0,
-                })),
-            }],
-        },
-    });
-    if (!sincronizacao.ok()) throw new Error(`criação do jogo: HTTP ${sincronizacao.status()}`);
-
-    const jogosResponse = await request.get(`api/v1/jogos?id_interclasse=${idInterclasse}`);
-    const jogos = await jogosResponse.json();
-    const jogo = (Array.isArray(jogos) ? jogos : []).find((item) => String(item.nome_jogo) === nomeJogo);
-    if (!jogo) throw new Error('API não retornou o jogo do fixture responsivo');
-
-    await agendarBloco(request, {
-        idInterclasse: Number(idInterclasse),
-        idModalidade: Number(modalidade.id_modalidade),
-        jogos: [{ id_jogo: Number(jogo.id_jogo) }],
-        label: 'E2E-responsivo',
-    });
-    return jogo;
 }
 
 test.describe('Responsividade homologada — celular Xiaomi horizontal e desktop Full HD', () => {
@@ -129,11 +81,17 @@ test.describe('Responsividade homologada — celular Xiaomi horizontal e desktop
 
         const url = new URL(page.url());
         const idInterclasse = url.searchParams.get('id');
-        let jogos = await (await request.get(`api/v1/jogos?id_interclasse=${idInterclasse}`)).json();
-        let jogo = Array.isArray(jogos) ? jogos.find((item) => Number(item.id_jogo) > 0) : null;
-        if (!jogo) {
-            jogo = await criarJogoResponsivo(request, Number(idInterclasse));
-        }
+        const login = await request.post('api/v1/login', { data: { matricula: 'admin', senha: '123' } });
+        if (!login.ok()) throw new Error(`login de preparação: HTTP ${login.status()}`);
+        await garantirCronogramaPublicado(request, Number(idInterclasse));
+        await garantirOperacaoLiberada(request, Number(idInterclasse));
+        const modalidades = await (await request.get(`api/v1/modalidades?id_interclasse=${idInterclasse}`)).json();
+        const modalidadesColetivas = (Array.isArray(modalidades) ? modalidades : []).filter((item) =>
+            String(item.status_modalidade) === '1'
+            && String(item.nome_tipo_modalidade || '').toLowerCase().includes('mata')
+        );
+        if (modalidadesColetivas.length === 0) throw new Error('fixture responsivo sem modalidade coletiva');
+        const { jogo } = await buscarPrimeiroJogoPlanejado(request, modalidadesColetivas);
 
         await page.evaluate((idJogo) => {
             window.__SGI_SPA__.navegarPara('jogos', { id_jogo: idJogo, origem: 'agenda_edit' });

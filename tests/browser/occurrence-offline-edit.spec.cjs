@@ -1,5 +1,9 @@
-const { test, expect, request: requestFactory } = require('./fixtures.cjs');
-const { agendarBloco, trocarSenhaInicial } = require('./agenda-helper.cjs');
+const { test, expect } = require('./fixtures.cjs');
+const {
+    buscarPrimeiroJogoPlanejado,
+    garantirCronogramaPublicado,
+    garantirOperacaoLiberada,
+} = require('./cronograma-fixture-helper.cjs');
 
 async function jsonOrThrow(response, label) {
     if (!response.ok()) throw new Error(`${label}: HTTP ${response.status()} ${await response.text()}`);
@@ -19,86 +23,40 @@ async function criarFixture(request) {
     );
     const edicao = edicoes.find((item) => String(item.status_interclasse) === '1');
     if (!edicao) throw new Error('Nenhuma edição ativa disponível.');
-    const idInterclasse = Number(edicao.id_interclasse);
+    let idInterclasse = Number(edicao.id_interclasse);
+    const cronograma = await garantirCronogramaPublicado(request, idInterclasse);
+    idInterclasse = Number(cronograma.id_interclasse || idInterclasse);
     const [equipes, modalidades] = await Promise.all([
         request.get(api(`api/v1/equipes?id_interclasse=${idInterclasse}`)).then((response) => jsonOrThrow(response, 'equipes')),
         request.get(api(`api/v1/modalidades?id_interclasse=${idInterclasse}`)).then((response) => jsonOrThrow(response, 'modalidades')),
     ]);
+    await garantirOperacaoLiberada(request, idInterclasse);
+    const modalidadesColetivas = modalidades.filter((item) =>
+        String(item.status_modalidade) === '1' &&
+        String(item.nome_tipo_modalidade || '').toLowerCase().includes('mata')
+    );
+    if (modalidadesColetivas.length === 0) throw new Error('Nenhuma modalidade mata-mata disponível.');
+    const planejado = await buscarPrimeiroJogoPlanejado(request, modalidadesColetivas);
     const modalidade = modalidades.find((item) =>
-        String(item.nome_tipo_modalidade || '').toLowerCase().includes('mata') &&
-        String(item.nome_modalidade || '').toLowerCase().includes('futsal')
+        Number(item.id_modalidade) === Number(planejado.jogo.modalidades_id_modalidade)
     );
-    if (!modalidade) throw new Error('Nenhuma modalidade futsal mata-mata disponível.');
-    const equipesDaModalidade = equipes.filter((item) => String(item.modalidades_id_modalidade) === String(modalidade.id_modalidade));
+    const equipesDaModalidade = equipes.filter((item) =>
+        String(item.modalidades_id_modalidade) === String(modalidade?.id_modalidade)
+    );
     if (equipesDaModalidade.length < 2) throw new Error('O fixture precisa de duas equipes.');
-
-    const nomeJogo = `T11 Occurrence ${Date.now()}`;
-    await jsonOrThrow(await request.post(api('api/v1/sincronizacao/chaveamento'), {
-        data: {
-            id_modalidade: Number(modalidade.id_modalidade),
-            tipo_modalidade: 'mata_mata',
-            jogos: [{
-                nome_jogo: nomeJogo,
-                status_jogo: 'Agendado',
-                partidas: [
-                    { id_equipe: Number(equipesDaModalidade[0].id_equipe), resultado: 0 },
-                    { id_equipe: Number(equipesDaModalidade[1].id_equipe), resultado: 0 },
-                ],
-            }],
-        },
-    }), 'criação do jogo');
-    const jogos = await jsonOrThrow(
-        await request.get(api(`api/v1/jogos?id_modalidade=${Number(modalidade.id_modalidade)}`)),
-        'consulta do jogo',
+    const jogoAgendado = planejado.jogo;
+    const idJogo = Number(jogoAgendado.id_jogo);
+    const equipeDoJogo = equipesDaModalidade.find((item) =>
+        Number(item.id_equipe) === Number(planejado.partidas[0].equipes_id_equipe)
     );
-    const jogo = jogos.find((item) => String(item.nome_jogo) === nomeJogo);
-    if (!jogo) throw new Error('Jogo criado não retornado pela API.');
-    const idJogo = Number(jogo.id_jogo);
-    await agendarBloco(request, {
-        idInterclasse,
-        idModalidade: Number(modalidade.id_modalidade),
-        jogos: [{ id_jogo: idJogo }],
-        label: 'T11-occurrence',
-    });
-    const jogosAgendados = await jsonOrThrow(
-        await request.get(api(`api/v1/jogos?id_modalidade=${Number(modalidade.id_modalidade)}`)),
-        'consulta do jogo agendado',
-    );
-    const jogoAgendado = jogosAgendados.find((item) => Number(item.id_jogo) === idJogo);
-    if (!jogoAgendado || !jogoAgendado.data_jogo) throw new Error('O jogo agendado não possui data persistida.');
-    const turma = Number(equipesDaModalidade[0].turmas_id_turma);
-    const matriculaAtleta = `91${Date.now()}${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
-    const aluno = await jsonOrThrow(await request.post(api('api/v1/usuarios?acao=criar_aluno'), {
-        data: {
-            nome_usuario: 'Atleta T11 Ocorrência',
-            matricula_usuario: matriculaAtleta,
-            genero_usuario: 'MASC',
-            data_nasc_usuario: '2008-01-01',
-            turmas_id_turma: turma,
-        },
-    }), 'criação do atleta fixture');
-    if (aluno.status !== 'sucesso') throw new Error(`criação do atleta fixture: ${aluno.mensagem || JSON.stringify(aluno)}`);
-    const senhaAtleta = String(aluno.senha_temporaria || '');
-    if (senhaAtleta === '') throw new Error('A API não retornou a senha temporária do atleta fixture.');
-    const alunoApi = await requestFactory.newContext({ baseURL: base });
-    try {
-        await jsonOrThrow(await alunoApi.post(api('api/v1/login'), {
-            data: { matricula: matriculaAtleta, senha: senhaAtleta },
-        }), 'login do atleta fixture');
-        await trocarSenhaInicial(alunoApi, api('api/v1/senha'));
-        await jsonOrThrow(await alunoApi.post(api('api/v1/termos'), { data: {} }), 'aceite dos termos do atleta fixture');
-        await jsonOrThrow(await alunoApi.post(api('api/v1/inscricoes'), {
-            data: { id_interclasse: idInterclasse, id_equipes: [Number(equipesDaModalidade[0].id_equipe)] },
-        }), 'inscrição do atleta fixture');
-    } finally {
-        await alunoApi.dispose();
-    }
+    if (!equipeDoJogo) throw new Error('O jogo planejado possui equipe fora da modalidade do fixture.');
+    const turma = Number(equipeDoJogo.turmas_id_turma);
     const atletas = await jsonOrThrow(
         await request.get(api(`api/v1/ocorrencias?acao=listar_atletas&id_jogo=${idJogo}&id_turma=${turma}`)),
         'atletas do jogo',
     );
-    const atleta = atletas.atletas && (atletas.atletas.find((item) => String(item.matricula_usuario) === matriculaAtleta) || atletas.atletas[0]);
-    if (!atleta) throw new Error(`O fixture não encontrou o atleta inscrito no jogo: ${JSON.stringify({ aluno, atletas })}`);
+    const atleta = atletas.atletas && atletas.atletas[0];
+    if (!atleta) throw new Error(`O fixture não encontrou um atleta para o jogo planejado: ${JSON.stringify(atletas)}`);
     const dataOcorrencia = String(jogoAgendado.data_jogo);
     const criarOcorrencia = (descricao, data) => request.post(api('api/v1/ocorrencias'), {
         data: {

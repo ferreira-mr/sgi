@@ -20,8 +20,8 @@ $paginaAtiva = 'dashboard';
 
     <section id="acoesCategoriaMobile" class="d-grid gap-2 mt-4 mb-5 sgi-categoria-actions" >
         <button type="button" id="btnAdicionarTurmaMobile" class="btn btn-outline-primary d-none" data-bs-toggle="modal" data-bs-target="#criarTurma">Adicionar turma</button>
-        <button type="button" id="btnEditarCategoriaMobile" class="btn btn-outline-primary d-none" onclick="abrirModalEditarCategoria(event)">Editar</button>
-        <button type="button" id="btnExcluirCategoriaMobile" class="btn btn-danger d-none" onclick="excluirCategoria()">Excluir</button>
+        <button type="button" id="btnEditarCategoriaMobile" class="btn btn-outline-primary d-none">Editar</button>
+        <button type="button" id="btnExcluirCategoriaMobile" class="btn btn-danger d-none">Excluir</button>
         <button data-bs-toggle="modal" data-bs-target="#modalCriarCategoria" class="btn btn-outline-danger">Adicionar Categoria</button>
         <a href="#" id="btnContinuarMobile" class="btn btn-primary">Continuar</a>
     </section>
@@ -43,11 +43,11 @@ $paginaAtiva = 'dashboard';
 
         <div id="acoesCategoriaDesktop" class="d-flex flex-wrap justify-content-end gap-3 mt-4 mb-5 sgi-categoria-actions" >
             <button type="button" id="btnAdicionarTurmaDesktop" class="btn btn-outline-primary d-none" data-bs-toggle="modal" data-bs-target="#criarTurma">Adicionar turma</button>
-            <button type="button" id="btnEditarCategoriaDesktop" class="btn btn-outline-primary fw-semibold rounded-3 px-4 py-2 d-flex align-items-center justify-content-center gap-2 shadow-lg d-none" onclick="abrirModalEditarCategoria(event)">
+            <button type="button" id="btnEditarCategoriaDesktop" class="btn btn-outline-primary fw-semibold rounded-3 px-4 py-2 d-flex align-items-center justify-content-center gap-2 shadow-lg d-none">
                 <i class="bi bi-pencil-square" aria-hidden="true"></i> Editar
             </button>
 
-            <button type="button" id="btnExcluirCategoriaDesktop" class="btn btn-danger fw-semibold rounded-3 px-4 py-2 d-flex align-items-center justify-content-center gap-2 shadow-lg d-none" onclick="excluirCategoria()">
+            <button type="button" id="btnExcluirCategoriaDesktop" class="btn btn-danger fw-semibold rounded-3 px-4 py-2 d-flex align-items-center justify-content-center gap-2 shadow-lg d-none">
                 <i class="bi bi-trash" aria-hidden="true"></i> Excluir
             </button>
 
@@ -90,7 +90,7 @@ $paginaAtiva = 'dashboard';
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label for="arquivoUpload" class="form-label fw-semibold">Selecionar PDF dos alunos</label>
+                        <label for="arquivoUpload" class="form-label fw-semibold">Selecionar PDF dos estudantes</label>
                         <input type="file" id="arquivoUpload" class="form-control" accept=".pdf,application/pdf" aria-describedby="descricaoArquivoUpload">
                         <p id="descricaoArquivoUpload" class="text-body-secondary small mt-2 mb-0">Formato aceito: PDF de até 10 MB. O arquivo deve conter texto selecionável.</p>
                         <span id="nomeArquivo" class="d-none small text-success mt-2" role="status" aria-live="polite" aria-atomic="true"></span>

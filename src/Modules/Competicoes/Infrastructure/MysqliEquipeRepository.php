@@ -8,15 +8,19 @@ use App\Modules\Competicoes\Application\EquipeLimiteException;
 use App\Modules\Competicoes\Domain\EquipeCapacityRules;
 use App\Modules\Competicoes\Domain\EquipeRepository;
 use App\Modules\Competicoes\Domain\EquipeRosterRules;
+use App\Modules\Competicoes\Domain\CronogramaRepository;
+use App\Modules\Competicoes\Domain\CronogramaRules;
 use App\Shared\Database\Transaction;
 use mysqli;
 use RuntimeException;
 
 final class MysqliEquipeRepository implements EquipeRepository
 {
-    public function __construct(private readonly mysqli $connection)
+    public function __construct(private readonly mysqli $connection, private readonly ?CronogramaRepository $cronograma = null)
     {
     }
+
+    private ?bool $planningAvailable = null;
 
     public function create(array $data): array
     {
@@ -157,7 +161,7 @@ final class MysqliEquipeRepository implements EquipeRepository
                         $alreadyOnTarget = true;
                         continue;
                     }
-                    throw new \InvalidArgumentException('O aluno já está vinculado a outra equipe desta modalidade.');
+                    throw new \InvalidArgumentException('O estudante já está vinculado a outra equipe desta modalidade.');
                 }
                 if ($alreadyOnTarget) {
                     // Replaying the same administrative request remains idempotent,
@@ -176,10 +180,16 @@ final class MysqliEquipeRepository implements EquipeRepository
 
             $newMembers = count($newUserIds);
             if ($newMembers > 0) {
+                foreach ($newUserIds as $newUserId) {
+                    $this->assertScheduleCompatibility($newUserId, $editionId, $teamId, $modalityId);
+                }
                 $teamMembers = $this->activeMemberCountForTeam($teamId);
-                $maxMembers = $modality['max_inscrito_modalidade'] === null
+                $plannedConfig = $this->plannedModality($modalityId);
+                $maxMembers = $plannedConfig !== null
+                    ? (int) $plannedConfig['max_inscritos_equipe']
+                    : ($modality['max_inscrito_modalidade'] === null
                     ? null
-                    : (int) $modality['max_inscrito_modalidade'];
+                    : (int) $modality['max_inscrito_modalidade']);
                 EquipeRosterRules::validarCapacidadeEquipe($teamMembers, $newMembers, $maxMembers);
 
                 $modalityMembers = $this->activeMemberCountForModalityClass($modalityId, $classId);
@@ -222,12 +232,12 @@ final class MysqliEquipeRepository implements EquipeRepository
              ORDER BY m.id_modalidade, e.id_equipe",
         );
         if ($statement === false) {
-            throw new RuntimeException('Não foi possível consultar as modalidades do aluno.');
+            throw new RuntimeException('Não foi possível consultar as modalidades do estudante.');
         }
         $statement->bind_param('ii', $userId, $editionId);
         if (!$statement->execute()) {
             $statement->close();
-            throw new RuntimeException('Não foi possível consultar as modalidades do aluno.');
+            throw new RuntimeException('Não foi possível consultar as modalidades do estudante.');
         }
         $rows = $statement->get_result()->fetch_all(MYSQLI_ASSOC);
         $statement->close();
@@ -264,17 +274,75 @@ final class MysqliEquipeRepository implements EquipeRepository
         );
     }
 
+    private function assertScheduleCompatibility(int $userId, int $editionId, int $teamId, int $modalityId): void
+    {
+        if ($this->cronograma === null || !$this->planningAvailable()) {
+            return;
+        }
+        $edition = $this->one('SELECT cronograma_status, inscricoes_status, inscricoes_abertura, inscricoes_encerramento FROM interclasse_planejamentos WHERE id_interclasse = ? LIMIT 1', 'i', [$editionId]);
+        if ($edition === null) {
+            return;
+        }
+        // O elenco administrativo é preparado antes da publicação. A janela
+        // pública de inscrições só deve ser exigida pelo caso de uso de
+        // inscrição; no rascunho/revisão ainda não há compromissos publicados
+        // contra os quais comparar a equipe.
+        if ((string) ($edition['cronograma_status'] ?? CronogramaRules::RASCUNHO) !== CronogramaRules::PUBLICADO) {
+            return;
+        }
+        $prepared = $this->one('SELECT id_equipe FROM equipe_planejamentos WHERE id_equipe = ? AND planejada = 1 LIMIT 1', 'i', [$teamId]);
+        if ($prepared === null) {
+            throw new \InvalidArgumentException('A equipe ainda não foi preparada no cronograma publicado.');
+        }
+        $existingIds = array_map(static fn (array $row): int => (int) $row['id_equipe'], $this->activeMembershipsInEdition($userId, $editionId));
+        $existingCommitments = $this->cronograma->commitmentsForTeams($editionId, $existingIds);
+        $candidateCommitments = $this->cronograma->commitmentsForTeams($editionId, [$teamId]);
+        foreach ($candidateCommitments as $candidate) {
+            foreach ($existingCommitments as $existing) {
+                if ((int) $candidate['id_modalidade'] === (int) $existing['id_modalidade']) {
+                    continue;
+                }
+                if (CronogramaRules::schedulesConflict($candidate, $existing)) {
+                    throw new \InvalidArgumentException(sprintf('Conflito de agenda entre as modalidades %s e %s.', $modalityId, (int) $existing['id_modalidade']));
+                }
+            }
+        }
+    }
+
+    private function planningAvailable(): bool
+    {
+        if ($this->planningAvailable !== null) {
+            return $this->planningAvailable;
+        }
+        $result = $this->connection->query("SELECT COUNT(*) AS total FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'interclasse_planejamentos'");
+        if ($result === false) {
+            return $this->planningAvailable = false;
+        }
+        $row = $result->fetch_assoc();
+        $result->free();
+        return $this->planningAvailable = ((int) ($row['total'] ?? 0) > 0);
+    }
+
+    /** @return array<string,mixed>|null */
+    private function plannedModality(int $modalityId): ?array
+    {
+        if (!$this->planningAvailable()) {
+            return null;
+        }
+        return $this->one('SELECT max_inscritos_equipe FROM modalidade_planejamentos WHERE id_modalidade = ? LIMIT 1', 'i', [$modalityId]);
+    }
+
     /** @param list<int> $params */
     private function count(string $sql, array $params): int
     {
         $statement = $this->connection->prepare($sql);
         if ($statement === false) {
-            throw new RuntimeException('Não foi possível contar os alunos da equipe.');
+            throw new RuntimeException('Não foi possível contar os estudantes da equipe.');
         }
         $statement->bind_param(str_repeat('i', count($params)), ...$params);
         if (!$statement->execute()) {
             $statement->close();
-            throw new RuntimeException('Não foi possível contar os alunos da equipe.');
+            throw new RuntimeException('Não foi possível contar os estudantes da equipe.');
         }
         $count = (int) $statement->get_result()->fetch_column();
         $statement->close();
@@ -288,12 +356,12 @@ final class MysqliEquipeRepository implements EquipeRepository
             'DELETE FROM equipes_has_usuarios WHERE equipes_id_equipe = ? AND usuarios_id_usuario = ?',
         );
         if ($statement === false) {
-            throw new RuntimeException('Não foi possível remover aluno da equipe.');
+            throw new RuntimeException('Não foi possível remover estudante da equipe.');
         }
         $statement->bind_param('ii', $teamId, $userId);
         if (!$statement->execute()) {
             $statement->close();
-            throw new RuntimeException('Não foi possível remover aluno da equipe.');
+            throw new RuntimeException('Não foi possível remover estudante da equipe.');
         }
         $statement->close();
     }

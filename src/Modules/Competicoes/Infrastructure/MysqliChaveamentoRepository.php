@@ -8,124 +8,6 @@ use App\Modules\Competicoes\Domain\ChaveamentoRules;
 
 final class MysqliChaveamentoRepository
 {
-    public static function resolverIdLocal(\mysqli $conn): int
-    {
-        $q = $conn->query("SELECT id_local FROM locais WHERE status_local = '1' ORDER BY id_local ASC LIMIT 1");
-        if ($q && $r = $q->fetch_assoc()) {
-            return (int) $r['id_local'];
-        }
-        $q2 = $conn->query('SELECT id_local FROM locais ORDER BY id_local ASC LIMIT 1');
-        if ($q2 && $r2 = $q2->fetch_assoc()) {
-            return (int) $r2['id_local'];
-        }
-        throw new \RuntimeException("Não há locais cadastrados na tabela 'locais'.");
-    }
-    /**
-     * Equipes ativas com pelo menos um competidor ativo vinculado (elenco mínimo).
-     *
-     * @return list<array{id_equipe:int}>
-     */
-    public static function buscarEquipesValidadas(\mysqli $conn, int $idModalidade): array
-    {
-        $sql = 'SELECT DISTINCT e.id_equipe
-            FROM equipes e
-            INNER JOIN equipes_has_usuarios ehu ON ehu.equipes_id_equipe = e.id_equipe
-            INNER JOIN usuarios u ON u.id_usuario = ehu.usuarios_id_usuario
-            WHERE e.modalidades_id_modalidade = ?
-              AND e.status_equipe = \'1\'
-              AND u.status_usuario = \'1\'';
-        $st = $conn->prepare($sql);
-        if (!$st) {
-            throw new \RuntimeException($conn->error);
-        }
-        $st->bind_param('i', $idModalidade);
-        $st->execute();
-        $rows = $st->get_result()->fetch_all(\MYSQLI_ASSOC);
-        $st->close();
-        return \array_map(static fn (array $r): array => ['id_equipe' => (int) $r['id_equipe']], $rows);
-    }
-    public static function faseInicialExiste(\mysqli $conn, int $idModalidade): bool
-    {
-        $st = $conn->prepare("SELECT 1 FROM jogos WHERE modalidades_id_modalidade = ? AND nome_jogo LIKE 'MM:%' LIMIT 1");
-        $st->bind_param('i', $idModalidade);
-        $st->execute();
-        $ok = $st->get_result()->num_rows > 0;
-        $st->close();
-        return $ok;
-    }
-    /**
-     * @param list<array{id_equipe:int}> $equipes
-     */
-    public static function criarChaveamentoInicial(\mysqli $conn, int $idModalidade, array $equipes): array
-    {
-        if (\App\Modules\Competicoes\Infrastructure\MysqliChaveamentoRepository::faseInicialExiste($conn, $idModalidade)) {
-            throw new \RuntimeException('O chaveamento desta modalidade já foi gerado (fase inicial MM).');
-        }
-        $n = \count($equipes);
-        if ($n < 2) {
-            throw new \RuntimeException('Equipes insuficientes (mínimo 2 com elenco validado).');
-        }
-        \shuffle($equipes);
-        $w = \App\Modules\Competicoes\Domain\ChaveamentoRules::proximoPow2($n);
-        $slots = \array_fill(0, $w, \null);
-        $idxSlots = \range(0, $w - 1);
-        \shuffle($idxSlots);
-        for ($i = 0; $i < $n; $i++) {
-            $slots[$idxSlots[$i]] = $equipes[$i]['id_equipe'];
-        }
-        $jogosCriados = 0;
-        $byeJogos = [];
-        $meio = (int) ($w / 2);
-        for ($s = 0; $s < $meio; $s++) {
-            $a = $slots[2 * $s];
-            $b = $slots[2 * $s + 1];
-            if ($a === \null && $b === \null) {
-                continue;
-            }
-            if ($a !== \null && $b !== \null) {
-                \App\Modules\Competicoes\Infrastructure\MysqliChaveamentoRepository::inserirJogoDupla($conn, $idModalidade, 0, $w, $s, 'N', $a, $b, 'Agendado');
-                $jogosCriados++;
-                continue;
-            }
-            $bye = $a ?? $b;
-            $idBye = \App\Modules\Competicoes\Infrastructure\MysqliChaveamentoRepository::inserirJogoBye($conn, $idModalidade, 0, $w, $s, (int) $bye);
-            $byeJogos[] = $idBye;
-            $jogosCriados++;
-        }
-        return ['jogos_criados' => $jogosCriados, 'bye_jogos' => $byeJogos];
-    }
-    public static function inserirJogoDupla(\mysqli $conn, int $idModalidade, int $idLocal, int $largura, int $slot, string $kind, int $idA, int $idB, string $statusJogo): int
-    {
-        $nome = \App\Modules\Competicoes\Domain\ChaveamentoRules::tag($largura, $slot, $kind);
-        $st = $conn->prepare("INSERT INTO jogos (nome_jogo, data_jogo, inicio_jogo, termino_jogo, status_jogo, modalidades_id_modalidade, locais_id_local)\r\n         VALUES (?, NULL, NULL, NULL, ?, ?, NULL)");
-        $st->bind_param('ssi', $nome, $statusJogo, $idModalidade);
-        $st->execute();
-        $idJogo = (int) $conn->insert_id;
-        $st->close();
-        self::aplicarReservaAgenda($conn, $idModalidade, $nome, $idJogo);
-        $stP = $conn->prepare("INSERT INTO partidas (jogos_id_jogo, equipes_id_equipe, resultado_partida, status_partida) VALUES (?, ?, 0, '1')");
-        $stP->bind_param('ii', $idJogo, $idA);
-        $stP->execute();
-        $stP->bind_param('ii', $idJogo, $idB);
-        $stP->execute();
-        $stP->close();
-        return $idJogo;
-    }
-    public static function inserirJogoBye(\mysqli $conn, int $idModalidade, int $idLocal, int $largura, int $slot, int $idEquipe): int
-    {
-        $nome = \App\Modules\Competicoes\Domain\ChaveamentoRules::tag($largura, $slot, 'B');
-        $st = $conn->prepare("INSERT INTO jogos (nome_jogo, data_jogo, inicio_jogo, termino_jogo, status_jogo, modalidades_id_modalidade, locais_id_local)\r\n         VALUES (?, NULL, NULL, NULL, 'Concluido', ?, NULL)");
-        $st->bind_param('si', $nome, $idModalidade);
-        $st->execute();
-        $idJogo = (int) $conn->insert_id;
-        $st->close();
-        self::aplicarReservaAgenda($conn, $idModalidade, $nome, $idJogo);
-        $stP = $conn->prepare("INSERT INTO partidas (jogos_id_jogo, equipes_id_equipe, resultado_partida, status_partida) VALUES (?, ?, 1, '1')");
-        $stP->bind_param('ii', $idJogo, $idEquipe);
-        $stP->execute();
-        $stP->close();
-        return $idJogo;
-    }
     /** @return list<array{equipes_id_equipe:int, resultado_partida:int}> */
     public static function carregarPartidasJogo(\mysqli $conn, int $idJogo): array
     {
@@ -206,6 +88,9 @@ final class MysqliChaveamentoRepository
         }
         $meta = \App\Modules\Competicoes\Domain\ChaveamentoRules::parse($row['nome_jogo']);
         if ($meta === \null) {
+            return;
+        }
+        if ($meta['largura'] === 2) {
             return;
         }
         if (\App\Modules\Competicoes\Infrastructure\MysqliChaveamentoRepository::contarPartidas($conn, $idJogoPai) !== 1) {
@@ -325,7 +210,7 @@ final class MysqliChaveamentoRepository
      */
     public static function chaveamentoProcessarAvanco(\mysqli $conn, int $idJogo): void
     {
-        $st = $conn->prepare('SELECT id_jogo, nome_jogo, status_jogo, modalidades_id_modalidade FROM jogos WHERE id_jogo = ? LIMIT 1');
+        $st = $conn->prepare('SELECT id_jogo, nome_jogo, status_jogo, modalidades_id_modalidade, data_jogo, locais_id_local FROM jogos WHERE id_jogo = ? LIMIT 1');
         $st->bind_param('i', $idJogo);
         $st->execute();
         $j = $st->get_result()->fetch_assoc();
@@ -367,12 +252,7 @@ final class MysqliChaveamentoRepository
         if ($ji === \null) {
             $existente = \App\Modules\Competicoes\Infrastructure\MysqliChaveamentoRepository::buscarJogoPorTag($conn, $idModalidade, $tagPai);
             if ($existente === \null) {
-                $stIns = $conn->prepare("INSERT INTO jogos (nome_jogo, data_jogo, inicio_jogo, termino_jogo, status_jogo, modalidades_id_modalidade, locais_id_local)\r\n                 VALUES (?, NULL, NULL, NULL, 'Agendado', ?, NULL)");
-                $stIns->bind_param('si', $tagPai, $idModalidade);
-                $stIns->execute();
-                $idPai = (int) $conn->insert_id;
-                $stIns->close();
-                self::aplicarReservaAgenda($conn, $idModalidade, $tagPai, $idPai);
+                $idPai = self::criarJogoDaFaseSeguinte($conn, $idModalidade, $tagPai, $j);
                 \App\Modules\Competicoes\Infrastructure\MysqliChaveamentoRepository::garantirPartidaEquipe($conn, $idPai, $w1);
             } else {
                 $idPai = (int) $existente['id_jogo'];
@@ -391,25 +271,101 @@ final class MysqliChaveamentoRepository
         }
         $existente = \App\Modules\Competicoes\Infrastructure\MysqliChaveamentoRepository::buscarJogoPorTag($conn, $idModalidade, $tagPai);
         if ($existente === \null) {
-            $stIns = $conn->prepare("INSERT INTO jogos (nome_jogo, data_jogo, inicio_jogo, termino_jogo, status_jogo, modalidades_id_modalidade, locais_id_local)\r\n             VALUES (?, NULL, NULL, NULL, 'Agendado', ?, NULL)");
-            $stIns->bind_param('si', $tagPai, $idModalidade);
-            $stIns->execute();
-            $idNovo = (int) $conn->insert_id;
-            $stIns->close();
-            self::aplicarReservaAgenda($conn, $idModalidade, $tagPai, $idNovo);
+            $idNovo = self::criarJogoDaFaseSeguinte($conn, $idModalidade, $tagPai, $j);
             \App\Modules\Competicoes\Infrastructure\MysqliChaveamentoRepository::garantirPartidaEquipe($conn, $idNovo, $w1);
             \App\Modules\Competicoes\Infrastructure\MysqliChaveamentoRepository::garantirPartidaEquipe($conn, $idNovo, $w2);
             return;
         }
         $idPai = (int) $existente['id_jogo'];
-        $stClean = $conn->prepare("DELETE FROM partidas WHERE jogos_id_jogo = ? AND equipes_id_equipe NOT IN (?, ?)");
-        self::desvincularHistoricoDasPartidas($conn, $idPai, [$w1, $w2]);
-        $stClean->bind_param('iii', $idPai, $w1, $w2);
-        $stClean->execute();
-        $stClean->close();
-        \App\Modules\Competicoes\Infrastructure\MysqliChaveamentoRepository::garantirPartidaEquipe($conn, $idPai, $w1);
-        \App\Modules\Competicoes\Infrastructure\MysqliChaveamentoRepository::garantirPartidaEquipe($conn, $idPai, $w2);
+        $partidasAtuais = \App\Modules\Competicoes\Infrastructure\MysqliChaveamentoRepository::carregarPartidasJogo($conn, $idPai);
+        $timesAtuais = \array_column($partidasAtuais, 'equipes_id_equipe');
+        \sort($timesAtuais);
+        $timesNovos = [$w1, $w2];
+        \sort($timesNovos);
+
+        $timesMudaram = ($timesAtuais !== $timesNovos);
+
+        if ($timesMudaram) {
+            $stClean = $conn->prepare("DELETE FROM partidas WHERE jogos_id_jogo = ? AND equipes_id_equipe NOT IN (?, ?)");
+            self::desvincularHistoricoDasPartidas($conn, $idPai, [$w1, $w2]);
+            $stClean->bind_param('iii', $idPai, $w1, $w2);
+            $stClean->execute();
+            $stClean->close();
+            \App\Modules\Competicoes\Infrastructure\MysqliChaveamentoRepository::garantirPartidaEquipe($conn, $idPai, $w1);
+            \App\Modules\Competicoes\Infrastructure\MysqliChaveamentoRepository::garantirPartidaEquipe($conn, $idPai, $w2);
+            if (\App\Modules\Competicoes\Domain\ChaveamentoRules::jogoEstaEncerrado((string) $existente['status_jogo'])) {
+                $stReabrir = $conn->prepare("UPDATE jogos SET status_jogo = 'Agendado' WHERE id_jogo = ?");
+                $stReabrir->bind_param('i', $idPai);
+                $stReabrir->execute();
+                $stReabrir->close();
+                $stReset = $conn->prepare("UPDATE partidas SET resultado_partida = 0 WHERE jogos_id_jogo = ?");
+                $stReset->bind_param('i', $idPai);
+                $stReset->execute();
+                $stReset->close();
+                self::limparAvancosPosteriores($conn, $idModalidade, $lPai);
+            }
+        } else {
+            \App\Modules\Competicoes\Infrastructure\MysqliChaveamentoRepository::garantirPartidaEquipe($conn, $idPai, $w1);
+            \App\Modules\Competicoes\Infrastructure\MysqliChaveamentoRepository::garantirPartidaEquipe($conn, $idPai, $w2);
+        }
     }
+
+    /** @param array<string,mixed> $jogoOrigem */
+    private static function criarJogoDaFaseSeguinte(\mysqli $conn, int $idModalidade, string $tag, array $jogoOrigem): int
+    {
+        $statement = $conn->prepare("INSERT INTO jogos (nome_jogo, data_jogo, inicio_jogo, termino_jogo, status_jogo, modalidades_id_modalidade, locais_id_local)\r\n             VALUES (?, ?, NULL, NULL, 'Agendado', ?, ?)");
+        $date = $jogoOrigem['data_jogo'] ?? null;
+        $local = isset($jogoOrigem['locais_id_local']) ? (int) $jogoOrigem['locais_id_local'] : null;
+        $statement->bind_param('ssii', $tag, $date, $idModalidade, $local);
+        $statement->execute();
+        $gameId = (int) $conn->insert_id;
+        $statement->close();
+        self::aplicarReservaAgenda($conn, $idModalidade, $tag, $gameId);
+        return $gameId;
+    }
+
+
+    private static function limparAvancosPosteriores(\mysqli $conn, int $idModalidade, int $larguraOrigem): void
+    {
+        $st = $conn->prepare("SELECT id_jogo, nome_jogo FROM jogos WHERE modalidades_id_modalidade = ? AND nome_jogo LIKE 'MM:%'");
+        $st->bind_param('i', $idModalidade);
+        $st->execute();
+        $games = $st->get_result()->fetch_all(\MYSQLI_ASSOC);
+        $st->close();
+        foreach ($games as $game) {
+            $meta = \App\Modules\Competicoes\Domain\ChaveamentoRules::parse((string) $game['nome_jogo']);
+            if ($meta === null || $meta['largura'] >= $larguraOrigem) {
+                continue;
+            }
+            $gameId = (int) $game['id_jogo'];
+            self::desvincularHistoricoDasPartidas($conn, $gameId);
+            $stDelete = $conn->prepare('DELETE FROM partidas WHERE jogos_id_jogo = ?');
+            $stDelete->bind_param('i', $gameId);
+            $stDelete->execute();
+            $stDelete->close();
+            $stReset = $conn->prepare("UPDATE jogos SET status_jogo = 'Agendado' WHERE id_jogo = ?");
+            $stReset->bind_param('i', $gameId);
+            $stReset->execute();
+            $stReset->close();
+        }
+    }
+
+    public static function reconciliarAvancosPendentes(\mysqli $conn, int $idModalidade): void
+    {
+        $st = $conn->prepare("SELECT id_jogo FROM jogos
+            WHERE modalidades_id_modalidade = ? AND nome_jogo LIKE 'MM:%'
+              AND status_jogo IN ('Concluido', 'Finalizado')
+            ORDER BY CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(nome_jogo, ':', 2), ':', -1) AS UNSIGNED) DESC, id_jogo ASC");
+        $st->bind_param('i', $idModalidade);
+        $st->execute();
+        $games = $st->get_result()->fetch_all(\MYSQLI_ASSOC);
+        $st->close();
+        foreach ($games as $game) {
+            self::chaveamentoProcessarAvanco($conn, (int) $game['id_jogo']);
+        }
+    }
+
+
     /**
      * Monta árvore JSON com hierarquia para o front.
      *
@@ -419,10 +375,12 @@ final class MysqliChaveamentoRepository
     {
         $sql = 'SELECT j.id_jogo, j.nome_jogo, j.status_jogo, j.data_jogo, j.inicio_jogo,
                    j.termino_jogo, j.locais_id_local, l.nome_local,
+                   j.modalidades_id_modalidade, m.interclasses_id_interclasse,
                    p.id_partida, p.equipes_id_equipe, p.resultado_partida,
                    t.nome_turma, t.nome_fantasia_turma,
                    e.nome_equipe
             FROM jogos j
+            INNER JOIN modalidades m ON m.id_modalidade = j.modalidades_id_modalidade
             LEFT JOIN locais l ON l.id_local = j.locais_id_local
             LEFT JOIN partidas p ON j.id_jogo = p.jogos_id_jogo
             LEFT JOIN equipes e ON p.equipes_id_equipe = e.id_equipe
@@ -439,36 +397,124 @@ final class MysqliChaveamentoRepository
             $idJ = (int) $row['id_jogo'];
             if (!isset($porJogo[$idJ])) {
                 $meta = \App\Modules\Competicoes\Domain\ChaveamentoRules::parse($row['nome_jogo']);
-                $porJogo[$idJ] = ['id_jogo' => $idJ, 'nome_jogo' => $row['nome_jogo'], 'status_jogo' => $row['status_jogo'], 'data_jogo' => $row['data_jogo'], 'inicio_jogo' => $row['inicio_jogo'], 'termino_jogo' => $row['termino_jogo'], 'locais_id_local' => $row['locais_id_local'] === null ? null : (int) $row['locais_id_local'], 'nome_local' => $row['nome_local'], 'meta' => $meta, 'partidas' => []];
+                $porJogo[$idJ] = ['id_jogo' => $idJ, 'nome_jogo' => $row['nome_jogo'], 'status_jogo' => $row['status_jogo'], 'data_jogo' => $row['data_jogo'], 'inicio_jogo' => $row['inicio_jogo'], 'termino_jogo' => $row['termino_jogo'], 'locais_id_local' => $row['locais_id_local'] === null ? null : (int) $row['locais_id_local'], 'nome_local' => $row['nome_local'], 'modalidades_id_modalidade' => (int) $row['modalidades_id_modalidade'], 'id_interclasse' => (int) $row['interclasses_id_interclasse'], 'meta' => $meta, 'partidas' => []];
             }
             if ($row['id_partida'] !== null) {
                 $porJogo[$idJ]['partidas'][] = ['id_partida' => (int) $row['id_partida'], 'equipes_id_equipe' => (int) $row['equipes_id_equipe'], 'resultado_partida' => (int) $row['resultado_partida'], 'nome_turma' => $row['nome_turma'], 'nome_fantasia_turma' => $row['nome_fantasia_turma'], 'nome_equipe' => $row['nome_equipe']];
+            }
+        }
+
+        // A árvore publicada também é a prévia do calendário: mantenha fases
+        // futuras visíveis antes de materializá-las como jogos operacionais.
+        $planningSchema = $conn->query("SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'cronograma_nos' LIMIT 1");
+        $hasPlanningSchema = $planningSchema !== false && $planningSchema->num_rows > 0;
+        if ($planningSchema !== false) {
+            $planningSchema->free();
+        }
+        if ($hasPlanningSchema) {
+            $edition = null;
+            $state = $conn->prepare('SELECT i.id_interclasse, ip.versao_publicada, ip.operacao_liberada FROM modalidades m INNER JOIN interclasses i ON i.id_interclasse = m.interclasses_id_interclasse INNER JOIN interclasse_planejamentos ip ON ip.id_interclasse = i.id_interclasse WHERE m.id_modalidade = ? AND ip.cronograma_status = \'publicado\' LIMIT 1');
+            $state->bind_param('i', $idModalidade);
+            $state->execute();
+            $edition = $state->get_result()->fetch_assoc() ?: null;
+            $state->close();
+            if ($edition !== null && $edition['versao_publicada'] !== null) {
+                $editionId = (int) $edition['id_interclasse'];
+                $version = (int) $edition['versao_publicada'];
+                $operationReleased = (int) $edition['operacao_liberada'] === 1;
+                $nodes = $conn->prepare('SELECT cn.id_no, cn.chave_tag, cn.tipo_no, cn.fase_largura, cn.slot, cn.origem_a_tag, cn.origem_b_tag, cc.data_compromisso, cc.inicio_compromisso, cc.termino_compromisso, cc.id_local, l.nome_local FROM cronograma_nos cn LEFT JOIN cronograma_compromissos cc ON cc.id_interclasse = cn.id_interclasse AND cc.id_modalidade = cn.id_modalidade AND cc.cronograma_versao = cn.cronograma_versao AND cc.chave_tag = cn.chave_tag LEFT JOIN locais l ON l.id_local = cc.id_local WHERE cn.id_interclasse = ? AND cn.id_modalidade = ? AND cn.cronograma_versao = ? AND cn.id_jogo IS NULL AND cn.tipo_no IN (\'normal\', \'bye\') ORDER BY cn.fase_largura DESC, cn.slot');
+                $nodes->bind_param('iii', $editionId, $idModalidade, $version);
+                $nodes->execute();
+                $plannedNodes = $nodes->get_result()->fetch_all(\MYSQLI_ASSOC);
+                $nodes->close();
+                foreach ($plannedNodes as $node) {
+                    $tag = (string) $node['chave_tag'];
+                    $alreadyVisible = false;
+                    foreach ($porJogo as $game) {
+                        if ((string) $game['nome_jogo'] === $tag) {
+                            $alreadyVisible = true;
+                            break;
+                        }
+                    }
+                    if ($alreadyVisible) {
+                        continue;
+                    }
+                    $meta = \App\Modules\Competicoes\Domain\ChaveamentoRules::parse($tag);
+                    if ($meta === null) {
+                        continue;
+                    }
+                    $partidas = [];
+                    if ($node['origem_a_tag'] === null && $node['origem_b_tag'] === null) {
+                        $teamStatement = $conn->prepare('SELECT e.id_equipe, e.nome_equipe, t.nome_turma, t.nome_fantasia_turma FROM cronograma_no_equipes cne INNER JOIN equipes e ON e.id_equipe = cne.id_equipe LEFT JOIN turmas t ON t.id_turma = e.turmas_id_turma WHERE cne.id_no = ? ORDER BY cne.lado, e.id_equipe');
+                        $nodeId = (int) $node['id_no'];
+                        $teamStatement->bind_param('i', $nodeId);
+                        $teamStatement->execute();
+                        $teams = $teamStatement->get_result()->fetch_all(\MYSQLI_ASSOC);
+                        $teamStatement->close();
+                        foreach ($teams as $team) {
+                            $partidas[] = [
+                                'id_partida' => 0,
+                                'equipes_id_equipe' => (int) $team['id_equipe'],
+                                'resultado_partida' => 0,
+                                'nome_turma' => $team['nome_turma'],
+                                'nome_fantasia_turma' => $team['nome_fantasia_turma'],
+                                'nome_equipe' => $team['nome_equipe'],
+                            ];
+                        }
+                    }
+                    $virtualId = -((int) $node['id_no']);
+                    $porJogo[$virtualId] = [
+                        'id_jogo' => $virtualId,
+                        'nome_jogo' => $tag,
+                        'status_jogo' => (string) $node['tipo_no'] === 'bye' ? 'Concluido' : ($operationReleased ? 'Aguardando' : 'Previsto'),
+                        'data_jogo' => $node['data_compromisso'],
+                        'inicio_jogo' => $node['inicio_compromisso'],
+                        'termino_jogo' => $node['termino_compromisso'],
+                        'locais_id_local' => $node['id_local'] === null ? null : (int) $node['id_local'],
+                        'nome_local' => $node['nome_local'],
+                        'modalidades_id_modalidade' => $idModalidade,
+                        'id_interclasse' => $editionId,
+                        'meta' => $meta,
+                        'partidas' => $partidas,
+                        'virtual_planejado' => true,
+                    ];
+                }
             }
         }
         $mapaChave = [];
         foreach ($porJogo as $idJ => $bloco) {
             $m = $bloco['meta'];
             if ($m !== \null) {
-                $mapaChave[$m['largura'] . ':' . $m['slot'] . ':' . $m['kind']] = $idJ;
+                $mapaChave[self::keyForBracketNode($m)] = $idJ;
             }
         }
         $saida = [];
+        $maiorFase = 0;
+        foreach ($porJogo as $bloco) {
+            $maiorFase = max($maiorFase, (int) ($bloco['meta']['largura'] ?? 0));
+        }
         foreach ($porJogo as $bloco) {
             $m = $bloco['meta'];
             $faseNivel = $m['largura'] ?? \null;
             $slot = $m['slot'] ?? \null;
             $kind = $m['kind'] ?? 'N';
-            $ehBye = $kind === 'B';
+            $ehBye = $kind === 'B' || (\count($bloco['partidas']) === 1 && \App\Modules\Competicoes\Domain\ChaveamentoRules::jogoEstaEncerrado((string) $bloco['status_jogo']));
             $proximoId = \null;
             $ehDisputaPosicao = isset($m['posicao']);
             if ($faseNivel !== \null && $faseNivel > 1 && $slot !== \null) {
                 $lp = \App\Modules\Competicoes\Domain\ChaveamentoRules::proximaLargura($faseNivel);
                 $sp = \App\Modules\Competicoes\Domain\ChaveamentoRules::slotPai($slot);
-                $chavePai = $lp . ':' . $sp . ':N';
+                $parent = $m;
+                $parent['largura'] = $lp;
+                $parent['slot'] = $sp;
+                $parent['kind'] = 'N';
+                $chavePai = self::keyForBracketNode($parent);
                 $proximoId = $mapaChave[$chavePai] ?? \null;
             }
             $venc = \null;
-            if ($m !== \null) {
+            if ($m !== \null && !empty($bloco['virtual_planejado']) && $ehBye) {
+                $venc = isset($bloco['partidas'][0]['equipes_id_equipe']) ? (int) $bloco['partidas'][0]['equipes_id_equipe'] : null;
+            } elseif ($m !== \null) {
                 $venc = \App\Modules\Competicoes\Infrastructure\MysqliChaveamentoRepository::vencedorDoJogo($conn, $bloco['id_jogo'], (string) $bloco['status_jogo'], $kind);
             }
             $vagaGarantida = $ehBye || $venc !== \null && $proximoId !== \null || $venc !== \null && (int) $faseNivel === 1;
@@ -483,7 +529,30 @@ final class MysqliChaveamentoRepository
             foreach ($bloco['partidas'] as $p) {
                 $equipesOut[] = ['id_partida' => $p['id_partida'], 'id_equipe' => $p['equipes_id_equipe'], 'nome_turma' => $p['nome_turma'], 'nome_fantasia' => $p['nome_fantasia_turma'], 'nome_equipe' => $p['nome_equipe'], 'gols' => $p['resultado_partida']];
             }
-            $saida[] = ['id_jogo' => $bloco['id_jogo'], 'nome_jogo' => $bloco['nome_jogo'], 'nome_jogo_display' => $nomeDisplay, 'nome_fase' => $nomeFase, 'fase_nivel' => $faseNivel, 'posicao_na_chave' => $posicaoNaChave, 'eh_bye' => $ehBye, 'eh_disputa_posicao' => $ehDisputaPosicao, 'status_jogo' => $bloco['status_jogo'], 'data_jogo' => $bloco['data_jogo'], 'inicio_jogo' => $bloco['inicio_jogo'], 'termino_jogo' => $bloco['termino_jogo'], 'locais_id_local' => $bloco['locais_id_local'], 'nome_local' => $bloco['nome_local'], 'equipes' => $equipesOut, 'equipe_vencedora_id' => $venc, 'proximo_jogo_id' => $proximoId, 'vaga_garantida' => $vagaGarantida];
+            $saida[] = [
+                'id_jogo' => $bloco['id_jogo'],
+                'nome_jogo' => $bloco['nome_jogo'],
+                'nome_jogo_display' => $nomeDisplay,
+                'nome_fase' => $nomeFase,
+                'fase_nivel' => $faseNivel,
+                'posicao_na_chave' => $posicaoNaChave,
+                'eh_bye' => $ehBye,
+                'eh_disputa_posicao' => $ehDisputaPosicao,
+                'status_jogo' => $bloco['status_jogo'],
+                'data_jogo' => $bloco['data_jogo'],
+                'inicio_jogo' => $bloco['inicio_jogo'],
+                'termino_jogo' => $bloco['termino_jogo'],
+                'locais_id_local' => $bloco['locais_id_local'],
+                'nome_local' => $bloco['nome_local'],
+                'exige_horario_agendado' => $faseNivel === null || $faseNivel >= $maiorFase,
+                'modalidades_id_modalidade' => $bloco['modalidades_id_modalidade'],
+                'id_interclasse' => $bloco['id_interclasse'],
+                'equipes' => $equipesOut,
+                'equipe_vencedora_id' => $venc,
+                'proximo_jogo_id' => $proximoId,
+                'vaga_garantida' => $vagaGarantida,
+                'virtual_planejado' => (bool) ($bloco['virtual_planejado'] ?? false),
+            ];
         }
         \usort($saida, static function (array $a, array $b): int {
             $fa = (int) ($a['fase_nivel'] ?? 0);
@@ -495,6 +564,19 @@ final class MysqliChaveamentoRepository
         });
         return ['success' => \true, 'jogos' => $saida];
     }
+
+    /** @param array<string,mixed> $node */
+    private static function keyForBracketNode(array $node): string
+    {
+        if (isset($node['posicao'])) {
+            return 'POS:' . (int) $node['posicao'] . ':' . (int) $node['slot'] . ':' . (string) $node['kind'];
+        }
+        $prefix = !empty($node['planejado'])
+            ? 'PL:' . (int) ($node['modalidade'] ?? 0) . ':' . (!empty($node['formato_legado']) ? '' : (int) ($node['turma'] ?? 0) . ':')
+            : 'MM:';
+        return $prefix . (int) $node['largura'] . ':' . (int) $node['slot'] . ':' . (string) $node['kind'];
+    }
+
     public static function perdedorDoJogo(\mysqli $conn, int $idJogo, string $statusJogo, string $kind): ?int
     {
         if (!\App\Modules\Competicoes\Domain\ChaveamentoRules::jogoEstaEncerrado($statusJogo)) {

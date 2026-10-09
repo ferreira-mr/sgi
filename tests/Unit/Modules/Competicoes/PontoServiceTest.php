@@ -27,7 +27,7 @@ final class PontoServiceTest extends TestCase
     public function testBlocksPointWithoutAthleteWithTheUserFacingMessage(): void
     {
         $this->expectExceptionObject(new InvalidArgumentException(
-            'Selecione o aluno responsável pela jogada para confirmar o ponto.',
+            'Selecione o estudante responsável pela jogada para confirmar o ponto.',
         ));
 
         (new PontoService(new InMemoryPontoRepository()))->registrar([

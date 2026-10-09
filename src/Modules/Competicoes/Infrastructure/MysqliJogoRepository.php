@@ -11,6 +11,8 @@ use RuntimeException;
 
 final class MysqliJogoRepository implements JogoRepository
 {
+    private ?bool $planningAvailable = null;
+
     public function __construct(private readonly mysqli $connection)
     {
     }
@@ -31,7 +33,18 @@ final class MysqliJogoRepository implements JogoRepository
             MysqliLocalScheduleGuard::lockLocals($this->connection, [$localId]);
             $modalityId = (int) ($data['modalidades_id_modalidade'] ?? 0);
             $modalityEditions = MysqliLocalScheduleGuard::lockModalities($this->connection, [$modalityId]);
-            MysqliLocalScheduleGuard::assertLocalBelongsToEdition($this->connection, $localId, $modalityEditions[$modalityId]);
+            $editionId = $modalityEditions[$modalityId];
+            MysqliLocalScheduleGuard::assertLocalBelongsToEdition($this->connection, $localId, $editionId);
+            if ($this->planningAvailable()) {
+                $planning = $this->connection->prepare('SELECT cronograma_status FROM interclasse_planejamentos WHERE id_interclasse = ? LIMIT 1 FOR UPDATE');
+                $planning->bind_param('i', $editionId);
+                $planning->execute();
+                $planningStatus = $planning->get_result()->fetch_column();
+                $planning->close();
+                if ($planningStatus === 'publicado') {
+                    throw new \InvalidArgumentException('O calendário publicado é a única fonte para criar os jogos desta edição.');
+                }
+            }
             $conflict = MysqliLocalScheduleGuard::conflict(
                 $this->connection,
                 (string) $data['data_jogo'],
@@ -113,5 +126,19 @@ final class MysqliJogoRepository implements JogoRepository
         $id = (int) $this->connection->insert_id;
         $statement->close();
         return $id;
+    }
+
+    private function planningAvailable(): bool
+    {
+        if ($this->planningAvailable !== null) {
+            return $this->planningAvailable;
+        }
+        $result = $this->connection->query("SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'interclasse_planejamentos' LIMIT 1");
+        if ($result === false) {
+            return $this->planningAvailable = false;
+        }
+        $exists = $result->num_rows > 0;
+        $result->free();
+        return $this->planningAvailable = $exists;
     }
 }

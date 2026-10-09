@@ -1,7 +1,11 @@
 const { test, expect } = require('./fixtures.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
-const { agendarBloco } = require('./agenda-helper.cjs');
+const {
+    buscarPrimeiroJogoPlanejado,
+    garantirCronogramaPublicado,
+    garantirOperacaoLiberada,
+} = require('./cronograma-fixture-helper.cjs');
 
 fs.mkdirSync(path.resolve(__dirname, '..', '..', 'test-results', 'sessions'), { recursive: true });
 
@@ -25,92 +29,28 @@ async function criarJogoFixture(request) {
     if (!edicao) throw new Error('Nenhuma edição ativa disponível para o teste de placar.');
 
     const idInterclasse = Number(edicao.id_interclasse);
+    await garantirCronogramaPublicado(request, idInterclasse);
+    await garantirOperacaoLiberada(request, idInterclasse);
     const [equipes, modalidades] = await Promise.all([
         request.get(api(`api/v1/equipes?id_interclasse=${idInterclasse}`)).then((response) => jsonOrThrow(response, 'equipes')),
         request.get(api(`api/v1/modalidades?id_interclasse=${idInterclasse}`)).then((response) => jsonOrThrow(response, 'modalidades')),
     ]);
+    const modalidadesColetivas = modalidades.filter((item) =>
+        String(item.status_modalidade) === '1'
+        && String(item.nome_tipo_modalidade || '').toLowerCase().includes('mata')
+    );
+    if (modalidadesColetivas.length === 0) throw new Error('Nenhuma modalidade mata-mata disponível.');
+    const { jogo, partidas } = await buscarPrimeiroJogoPlanejado(request, modalidadesColetivas);
     const modalidade = modalidades.find((item) =>
-        String(item.nome_tipo_modalidade || '').toLowerCase().includes('mata') &&
-        String(item.nome_modalidade || '').toLowerCase().includes('futsal')
+        Number(item.id_modalidade) === Number(jogo.modalidades_id_modalidade)
     );
-    if (!modalidade) throw new Error('Nenhuma modalidade de futsal mata-mata disponível.');
-    const disponiveis = equipes.filter((item) => String(item.modalidades_id_modalidade) === String(modalidade.id_modalidade));
+    const disponiveis = equipes.filter((item) => String(item.modalidades_id_modalidade) === String(modalidade?.id_modalidade));
     if (disponiveis.length < 2) throw new Error('O fixture precisa de duas equipes.');
-    await garantirAtletas(request, idInterclasse, disponiveis.slice(0, 2));
-
-    const nomeJogo = `T10 Score ${Date.now()}`;
-    await jsonOrThrow(await request.post(api('api/v1/sincronizacao/chaveamento'), {
-        data: {
-            id_modalidade: Number(modalidade.id_modalidade),
-            tipo_modalidade: 'mata_mata',
-            jogos: [{
-                nome_jogo: nomeJogo,
-                status_jogo: 'Agendado',
-                partidas: [
-                    { id_equipe: Number(disponiveis[0].id_equipe), resultado: 0 },
-                    { id_equipe: Number(disponiveis[1].id_equipe), resultado: 0 },
-                ],
-            }],
-        },
-    }), 'criação do jogo');
-
-    const jogos = await jsonOrThrow(
-        await request.get(api(`api/v1/jogos?id_modalidade=${Number(modalidade.id_modalidade)}`)),
-        'consulta do jogo',
-    );
-    const jogo = jogos.find((item) => String(item.nome_jogo) === nomeJogo);
-    if (!jogo) throw new Error('A API não retornou o jogo criado.');
-    const partidas = await jsonOrThrow(
-        await request.get(api(`api/v1/partidas?id_jogo=${Number(jogo.id_jogo)}`)),
-        'consulta das partidas',
-    );
-    await agendarBloco(request, {
-        idInterclasse,
-        idModalidade: Number(modalidade.id_modalidade),
-        jogos: [{ id_jogo: Number(jogo.id_jogo) }],
-        label: 'T10-score',
-    });
     return {
         idInterclasse,
         idJogo: Number(jogo.id_jogo),
         idsPartidas: partidas.map((item) => String(item.id_partida)),
     };
-}
-
-function apiPath(value) {
-    const base = process.env.SGI_BASE_URL || 'http://localhost/SGI/';
-    return new URL(value, base).href;
-}
-
-async function garantirAtletas(request, idInterclasse, equipes) {
-    for (let index = 0; index < equipes.length; index += 1) {
-        const equipe = equipes[index];
-        const membros = await jsonOrThrow(
-            await request.get(apiPath(`api/v1/equipes?id_equipe=${Number(equipe.id_equipe)}`)),
-            `membros da equipe ${equipe.id_equipe}`,
-        );
-        if (membros.some((membro) => Number(membro.id_usuario) > 0)) continue;
-        const alunos = await jsonOrThrow(
-            await request.get(apiPath(`api/v1/usuarios?acao=listar_competidores&id_turma=${Number(equipe.turmas_id_turma)}&id_interclasse=${idInterclasse}`)),
-            `alunos da equipe ${equipe.id_equipe}`,
-        );
-        let idUsuario = (alunos.competidores || []).find((aluno) => String(aluno.status_usuario || '1') === '1')?.id_usuario;
-        if (!Number(idUsuario)) {
-            const criado = await jsonOrThrow(await request.post(apiPath('api/v1/usuarios?acao=criar_aluno'), {
-                data: {
-                    nome_usuario: `Atleta T10 ${index + 1} ${Date.now()}`,
-                    matricula_usuario: `T10${Date.now()}${index}`,
-                    data_nasc_usuario: '2010-01-01',
-                    genero_usuario: 'MASC',
-                    turmas_id_turma: Number(equipe.turmas_id_turma),
-                },
-            }), `criação do atleta ${equipe.id_equipe}`);
-            idUsuario = criado.id_usuario || criado.id;
-        }
-        await jsonOrThrow(await request.post(apiPath('api/v1/equipes'), {
-            data: { acao: 'adicionar_usuarios', id_equipe: Number(equipe.id_equipe), usuarios: [Number(idUsuario)] },
-        }), `vínculo do atleta ${equipe.id_equipe}`);
-    }
 }
 
 async function navegar(page, tela, params) {

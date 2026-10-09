@@ -73,6 +73,46 @@ final class CronometroServiceTest extends TestCase
         self::assertSame(0, $repository->saveCalls);
     }
 
+    public function testPrimeiraFaseAindaExigeHorarioParaIniciar(): void
+    {
+        $repository = new CronometroRepositoryFake();
+        $repository->state['status_jogo'] = 'Agendado';
+        $repository->state['inicio_jogo'] = null;
+        $repository->state['termino_jogo'] = null;
+        $repository->state['exige_horario_agendado'] = true;
+
+        $this->expectException(\InvalidArgumentException::class);
+        (new CronometroService($repository, static fn (): int => 1000))->atualizar(12, [
+            'cronometro' => [
+                'versao' => 2,
+                'saldo_segundos' => 1200,
+                'referencia_epoch_ms' => 1000000,
+                'status_jogo' => 'Iniciado',
+            ],
+        ]);
+    }
+
+    public function testFasePosteriorIniciaComDataELocalMesmoSemHorario(): void
+    {
+        $repository = new CronometroRepositoryFake();
+        $repository->state['status_jogo'] = 'Agendado';
+        $repository->state['inicio_jogo'] = null;
+        $repository->state['termino_jogo'] = null;
+        $repository->state['exige_horario_agendado'] = false;
+
+        $result = (new CronometroService($repository, static fn (): int => 1000))->atualizar(12, [
+            'cronometro' => [
+                'versao' => 2,
+                'saldo_segundos' => 1200,
+                'referencia_epoch_ms' => 1000000,
+                'status_jogo' => 'Iniciado',
+            ],
+        ]);
+
+        self::assertSame('Iniciado', $result['snapshot']['status_jogo']);
+        self::assertSame(1, $repository->saveCalls);
+    }
+
     public function testSnapshotTerminalNaoConcluiPartidaColetivaAberta(): void
     {
         $repository = new CronometroRepositoryFake();

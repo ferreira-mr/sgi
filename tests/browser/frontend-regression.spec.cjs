@@ -118,7 +118,6 @@ async function entrar(page, matricula, senha = '123') {
 async function validarTela(page, testInfo, nome, caminho, seletores = ['main']) {
     await page.goto(caminho, { waitUntil: 'domcontentloaded' });
     await expect(page.locator('body')).not.toContainText(/Fatal error|Parse error|Warning:|Call to undefined/i);
-    await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
 
     await expect.poll(async () => {
         for (const seletor of seletores) {
@@ -132,7 +131,7 @@ async function validarTela(page, testInfo, nome, caminho, seletores = ['main']) 
         return false;
     }, { timeout: 15_000 }).toBe(true);
 
-    await page.waitForTimeout(350);
+    await aguardarDoisFramesDePintura(page);
     await capturarTela(page, testInfo, nome);
 }
 
@@ -149,8 +148,14 @@ async function validarTelaMesario(page, testInfo, nome, callback, seletores = ['
         }
         return false;
     }, { timeout: 20_000 }).toBe(true);
-    await page.waitForTimeout(350);
+    await aguardarDoisFramesDePintura(page);
     await capturarTela(page, testInfo, nome);
+}
+
+async function aguardarDoisFramesDePintura(page) {
+    await page.evaluate(() => new Promise((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(resolve));
+    }));
 }
 
 function ouvirErros(page) {
@@ -161,7 +166,7 @@ function ouvirErros(page) {
 
 async function capturarTela(page, testInfo, nome) {
     const caminho = testInfo.outputPath('screens', `${nome}.png`);
-    await page.screenshot({ path: caminho, fullPage: true });
+    await page.screenshot({ path: caminho, fullPage: true, animations: 'disabled' });
     await testInfo.attach(`${nome}.png`, { path: caminho, contentType: 'image/png' });
 }
 
@@ -230,7 +235,7 @@ test.describe('Frontend — regressão visual por perfil', () => {
             const mobileList = page.locator('#listaAlunosMobile');
             await expect(desktopList).toContainText(matriculas[0]);
             await expect(desktopList).toContainText(matriculas[1]);
-            await expect(desktopList).not.toContainText('Erro ao carregar alunos.');
+            await expect(desktopList).not.toContainText('Erro ao carregar estudantes.');
             await expect(desktopList.locator('img, svg[onload]')).toHaveCount(0);
 
             await page.locator('#buscaAlunosDesktop').fill(matriculas[0]);
@@ -271,7 +276,7 @@ test.describe('Frontend — regressão visual por perfil', () => {
             expect(saved.status()).toBe(200);
             expect(JSON.parse(submitted.postData() || '{}').usuarios).toEqual([Number(primeiro.id_usuario)]);
             await expect(page.locator('#btnSalvarAlunosDesktop')).toBeDisabled();
-            await expect(page.locator('#btnSalvarAlunosDesktop')).toHaveAccessibleName(/Adicionar 0 alunos/);
+            await expect(page.locator('#btnSalvarAlunosDesktop')).toHaveAccessibleName(/Adicionar 0 estudantes/);
             await expect(page.locator('#buscaAlunosDesktop')).toHaveValue(matriculas[0]);
             await expect(desktopList.locator('label')).toHaveCount(1);
             await expect(desktopList).toContainText(matriculas[0]);
@@ -658,8 +663,13 @@ test.describe('Frontend — regressão visual por perfil', () => {
                 ['colaboradores', `colaboradores?id=${ctx.idInterclasse}&modo=view`],
             ]) {
                 await page.goto(rota, { waitUntil: 'domcontentloaded' });
-                await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
                 await expect(page.locator('main:visible').first()).toBeVisible();
+                const seletorConteudo = tela === 'dashboard'
+                    ? '.main-dashboard-layout .row > .col-12.col-md-6:nth-child(2)'
+                    : tela === 'colaboradores'
+                        ? '#statsMobile > .col'
+                        : '.sgi-config-modalities-actions';
+                await expect(page.locator(seletorConteudo).first()).toBeVisible();
                 if (tela === 'colaboradores') {
                     await page.locator('#statColabMob').evaluate((element) => { element.textContent = '1234'; });
                 }
@@ -785,7 +795,6 @@ test.describe('Frontend — regressão visual por perfil', () => {
             ]) {
                 if (tela === 'resumo') respostasResumo.length = 0;
                 await page.goto(rota, { waitUntil: 'domcontentloaded' });
-                await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
                 await expect(page.locator('main:visible').first()).toBeVisible();
                 if (tela === 'resumo') {
                     const basePath = await page.evaluate(() => String(window.SGI_BASE_PATH || '').replace(/\/+$/, ''));
@@ -914,7 +923,8 @@ test.describe('Frontend — regressão visual por perfil', () => {
             ['modalidades-competicao-desktop', `modalidades?id=${ctx.idInterclasse}`, '#listaModalidadesDesktop', '#acoesModalidadesDesktop', '.row > .col-12'],
         ]) {
             await page.goto(rota, { waitUntil: 'domcontentloaded' });
-            await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
+            await expect(page.locator(seletorAcoes)).toBeVisible();
+            await expect(page.locator(lista).locator(seletorItem).last()).toBeVisible();
             const acoes = page.locator(seletorAcoes);
             await expect(acoes).toBeVisible();
             const ultimaLinha = page.locator(lista).locator(seletorItem).last();

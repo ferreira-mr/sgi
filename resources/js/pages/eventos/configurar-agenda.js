@@ -53,7 +53,7 @@ window.SGIPage.mount("eventos/configurar-agenda", function (pageConfig, pageScop
         if (jogoEhIndividual(jogo)) {
             return 'Competição Individual';
         }
-        const mm = (nomeJogo || '').match(/^MM:(\d+):(\d+):([NB])$/);
+        const mm = (nomeJogo || '').match(/^(?:PL:\d+:(?:-?\d+:)?)?MM:(\d+):(\d+):([NB])$/);
         if (mm) {
             const largura = parseInt(mm[1], 10);
             const slot = parseInt(mm[2], 10);
@@ -102,7 +102,8 @@ window.SGIPage.mount("eventos/configurar-agenda", function (pageConfig, pageScop
 
     function podeIniciar(j) {
         if (!j || j.status_jogo !== 'Agendado') return false;
-        if (!j.data_jogo || !j.inicio_jogo || !j.termino_jogo || !j.locais_id_local) return false;
+        const horarioObrigatorio = j.exige_horario_agendado !== false;
+        if (!j.data_jogo || !j.locais_id_local || (horarioObrigatorio && (!j.inicio_jogo || !j.termino_jogo))) return false;
         const hj = hojeISO();
         return j.data_jogo <= hj;
     }
@@ -193,6 +194,23 @@ window.SGIPage.mount("eventos/configurar-agenda", function (pageConfig, pageScop
         );
         const ids = [...new Set(modalidadesLista.map((m) => m.id_modalidade).filter(Boolean))];
         if (ids.length === 0) return;
+        // Durante a operação offline, a fila/projeção do mesário é a fonte
+        // atualizada: resultados podem ter criado semifinais/final locais
+        // depois do snapshot HTTP preparado. Usar somente o cache GET faria
+        // a agenda esquecer esses nós temporários até a reconexão.
+        if (navigator.onLine === false && window.SGIDataLayer && typeof window.SGIDataLayer.read === 'function') {
+            try {
+                const locais = await window.SGIDataLayer.read('jogos');
+                const idsPermitidos = new Set(ids.map((id) => String(id)));
+                const jogosLocais = (Array.isArray(locais) ? locais : [])
+                    .filter((j) => idsPermitidos.has(String(j.modalidades_id_modalidade || j.id_modalidade)))
+                    .map((j) => ({ ...j, modalidades_id_modalidade: Number(j.modalidades_id_modalidade || j.id_modalidade) }));
+                if (jogosLocais.length > 0) {
+                    jogosCache = await enriquecerNomesEquipesLocais(jogosLocais);
+                    return;
+                }
+            } catch (_) { /* segue para o snapshot/cache HTTP */ }
+        }
         const batches = await Promise.all(
             ids.map((id) =>
                 fetch(`${API}jogos?id_modalidade=${encodeURIComponent(id)}`).then(async (r) => {
@@ -653,7 +671,6 @@ window.SGIPage.mount("eventos/configurar-agenda", function (pageConfig, pageScop
     function preencherSelectModalidades() {
         const desk = document.getElementById('agenda-select-mod');
         const mob = document.getElementById('agenda-select-mod-mobile');
-        const autoSel = document.getElementById('auto-modalidade');
 
         if (desk && mob) {
             const cur = desk.value;
@@ -685,25 +702,6 @@ window.SGIPage.mount("eventos/configurar-agenda", function (pageConfig, pageScop
             }
         }
 
-        if (autoSel) {
-            autoSel.innerHTML = '';
-            const modalidadesSequenciais = modalidadesLista.filter((m) => resolverTipoCompeticao(m) === 'mata_mata');
-            if (modalidadesSequenciais.length === 0) {
-                const vazio = document.createElement('option');
-                vazio.value = '';
-                vazio.textContent = 'Nenhuma modalidade Mata-Mata disponível';
-                vazio.disabled = true;
-                vazio.selected = true;
-                autoSel.appendChild(vazio);
-            }
-            modalidadesSequenciais.forEach((m) => {
-                const t = `${m.nome_modalidade || ''} (${m.nome_categoria || ''})`;
-                const opt = document.createElement('option');
-                opt.value = String(m.id_modalidade);
-                opt.textContent = t;
-                autoSel.appendChild(opt);
-            });
-        }
     }
 
     async function carregarLocais() {
@@ -719,33 +717,25 @@ window.SGIPage.mount("eventos/configurar-agenda", function (pageConfig, pageScop
         );
 
         const sel = document.getElementById('edit-jogo-local');
-        const autoLoc = document.getElementById('auto-local');
-        const seqLoc = document.getElementById('seq-local');
 
         if (sel) sel.innerHTML = '<option value="">A definir</option>';
-        if (autoLoc) autoLoc.innerHTML = '';
-        if (seqLoc) seqLoc.innerHTML = '';
 
         if (locaisLista.length === 0) {
             if (sel) sel.innerHTML = '<option value="">Nenhum local disponível</option>';
-            if (autoLoc) autoLoc.innerHTML = '<option value="">Nenhum local disponível</option>';
-            if (seqLoc) seqLoc.innerHTML = '<option value="">Nenhum local disponível</option>';
             return;
         }
 
         locaisLista.forEach((loc) => {
             const optionHtml = `<option value="${loc.id_local}">${escapeHtml(loc.nome_local || 'Local')}</option>`;
             if (sel) sel.innerHTML += optionHtml;
-            if (autoLoc) autoLoc.innerHTML += optionHtml;
-            if (seqLoc) seqLoc.innerHTML += optionHtml;
         });
     }
 
     /* Helper para cálculo e ordenação dos jogos pelo chaveamento */
     function ordenarJogosChaveamento(jogos) {
         return jogos.sort((a, b) => {
-            const mmA = (a.nome_jogo || '').match(/^MM:(\d+):(\d+):([NB])$/);
-            const mmB = (b.nome_jogo || '').match(/^MM:(\d+):(\d+):([NB])$/);
+            const mmA = (a.nome_jogo || '').match(/^(?:PL:\d+:(?:-?\d+:)?)?MM:(\d+):(\d+):([NB])$/);
+            const mmB = (b.nome_jogo || '').match(/^(?:PL:\d+:(?:-?\d+:)?)?MM:(\d+):(\d+):([NB])$/);
 
             if (mmA && mmB) {
                 const largA = parseInt(mmA[1], 10);
@@ -792,6 +782,490 @@ window.SGIPage.mount("eventos/configurar-agenda", function (pageConfig, pageScop
         }
         
         atualizarTelas();
+
+        /* ── CRONOGRAMA PLANEJADO ANTES DAS INSCRIÇÕES ── */
+        let cronogramaEstado = null;
+        let cronogramaRascunho = null;
+        let cronogramaEstadoConfiavel = false;
+        let cronogramaEmProgresso = false;
+        let cronogramaGeracao = 0;
+        let cronogramaMontagem = 0;
+        let equipesPreparadasSessao = false;
+        const painelCronograma = document.getElementById('painelCronogramaPlanejado');
+        if (painelCronograma && interclasseAtual?.id_interclasse) {
+            const cronogramaId = Number(interclasseAtual.id_interclasse);
+            const statusCronograma = document.getElementById('cronogramaPlanejadoStatus');
+            const resumoCronograma = document.getElementById('cronogramaPlanejadoResumo');
+            const preparar = document.getElementById('cronogramaPreparar');
+            const gerar = document.getElementById('cronogramaGerar');
+            const botaoPublicar = document.getElementById('cronogramaPublicar');
+            const botaoAbrir = document.getElementById('cronogramaAbrir');
+            const botaoFechar = document.getElementById('cronogramaFechar');
+            const botaoLiberar = document.getElementById('cronogramaLiberar');
+            const botaoRevisar = document.getElementById('cronogramaRevisar');
+            const botaoAtualizar = document.getElementById('cronogramaAtualizar');
+            const cronogramaPrevia = document.getElementById('cronogramaPrevia');
+            const cronogramaPreviaStatus = document.getElementById('cronogramaPreviaStatus');
+            const cronogramaPreviaCorpo = document.getElementById('cronogramaPreviaCorpo');
+            const campoInscricaoInicio = document.getElementById('cronogramaInscricaoInicio');
+            const campoInscricaoFim = document.getElementById('cronogramaInscricaoFim');
+            const hoje = hojeISO();
+            const campoInicio = document.getElementById('cronogramaDataInicio');
+            const campoFim = document.getElementById('cronogramaDataFim');
+            if (campoInicio && !campoInicio.value) campoInicio.value = hoje;
+            if (campoFim && !campoFim.value) campoFim.value = hoje;
+            pageScope.onDeactivate(() => {
+                cronogramaMontagem++;
+                cronogramaGeracao++;
+                cronogramaEmProgresso = false;
+                cronogramaEstadoConfiavel = false;
+            });
+
+            const camposGeracao = [
+                campoInicio,
+                campoFim,
+                document.getElementById('cronogramaHoraInicio'),
+                document.getElementById('cronogramaHoraFim'),
+                document.getElementById('cronogramaDuracao'),
+            ].filter(Boolean);
+            const assinaturaGeracao = () => JSON.stringify(camposGeracao.map((campo) => campo.value));
+            const valorDataHoraLocal = (value) => String(value || '').replace(' ', 'T').slice(0, 16);
+            [campoInscricaoInicio, campoInscricaoFim].filter(Boolean).forEach((field) => {
+                pageScope.listen(field, 'input', () => { field.dataset.userEdited = 'true'; });
+            });
+            const renderizarPrevia = () => {
+                if (!cronogramaPrevia || !cronogramaPreviaStatus || !cronogramaPreviaCorpo || !cronogramaEstado) return;
+                const draftIsCurrent = cronogramaRascunho
+                    && cronogramaRascunho.cronograma_versao === Number(cronogramaEstado.cronograma_versao || 0)
+                    && ['rascunho', 'revisao'].includes(String(cronogramaEstado.cronograma_status));
+                const isPublished = cronogramaEstado.cronograma_status === 'publicado'
+                    && Number(cronogramaEstado.versao_publicada || 0) === Number(cronogramaEstado.cronograma_versao || 0);
+                const isSuspended = cronogramaEstado.cronograma_status === 'revisao';
+                if (!draftIsCurrent && !isPublished && !isSuspended) {
+                    cronogramaPrevia.classList.add('d-none');
+                    return;
+                }
+                cronogramaPrevia.classList.remove('d-none');
+                let commitments = [];
+                if (draftIsCurrent) {
+                    commitments = Array.isArray(cronogramaRascunho.compromissos) ? cronogramaRascunho.compromissos : [];
+                    cronogramaPreviaStatus.textContent = `Rascunho da revisão ${Number(cronogramaRascunho.cronograma_versao)}. Esta prévia ainda não foi publicada.`;
+                } else if (isPublished) {
+                    commitments = Array.isArray(cronogramaEstado.compromissos) ? cronogramaEstado.compromissos : [];
+                    cronogramaPreviaStatus.textContent = `Versão publicada ${Number(cronogramaEstado.versao_publicada)}.`;
+                } else {
+                    cronogramaPreviaStatus.textContent = 'A versão publicada está suspensa durante a revisão. Gere um rascunho novo para conferir os horários atualizados.';
+                }
+                cronogramaPreviaCorpo.replaceChildren();
+                if (commitments.length === 0) {
+                    const empty = document.createElement('p');
+                    empty.className = 'small text-body-secondary mb-0';
+                    empty.textContent = isSuspended && !draftIsCurrent ? 'A nova versão ainda não foi gerada.' : 'Esta versão não possui compromissos agendados.';
+                    cronogramaPreviaCorpo.append(empty);
+                    return;
+                }
+                const modalities = new Map((cronogramaEstado.modalidades || []).map((item) => [Number(item.id_modalidade), item.nome_modalidade]));
+                const locals = new Map((locaisLista || []).map((item) => [Number(item.id_local), item.nome_local]));
+                const labelDaEtapa = (tag) => {
+                    const parts = String(tag || '').split(':');
+                    if (parts[3] === 'IND') return 'Prova individual';
+                    if (parts[3] !== 'MM') return 'Partida prevista';
+                    const width = Number(parts[4] || 0);
+                    const slot = Number(parts[5] || 0) + 1;
+                    const names = { 2: 'Final', 4: 'Semifinal', 8: 'Quartas de final', 16: 'Oitavas de final' };
+                    return `${names[width] || `Fase ${width}`} · partida ${slot}`;
+                };
+                const table = document.createElement('table');
+                table.className = 'table table-sm table-striped align-middle mb-0';
+                const head = document.createElement('thead');
+                const headerRow = document.createElement('tr');
+                ['Modalidade e etapa', 'Data e horário', 'Local'].forEach((label) => {
+                    const cell = document.createElement('th');
+                    cell.scope = 'col';
+                    cell.textContent = label;
+                    headerRow.append(cell);
+                });
+                head.append(headerRow);
+                const body = document.createElement('tbody');
+                commitments.forEach((item) => {
+                    const row = document.createElement('tr');
+                    const modality = document.createElement('td');
+                    const modalityName = item.nome_modalidade || modalities.get(Number(item.id_modalidade)) || `Modalidade ${Number(item.id_modalidade || 0)}`;
+                    const conditional = Number(item.condicional || 0) === 1 ? ' · possível conforme resultados' : '';
+                    modality.textContent = `${modalityName} · ${labelDaEtapa(item.chave_tag)}${conditional}`;
+                    const when = document.createElement('td');
+                    const rawDate = String(item.data_compromisso || item.data || '');
+                    const [year, month, day] = rawDate.split('-');
+                    const date = year && month && day ? `${day}/${month}/${year}` : rawDate;
+                    const start = String(item.inicio_compromisso || item.inicio || '').slice(0, 5);
+                    const end = String(item.termino_compromisso || item.fim || '').slice(0, 5);
+                    when.textContent = `${date} · ${start}–${end}`;
+                    const local = document.createElement('td');
+                    local.textContent = item.nome_local || locals.get(Number(item.id_local)) || `Local ${Number(item.id_local || 0)}`;
+                    row.append(modality, when, local);
+                    body.append(row);
+                });
+                table.append(head, body);
+                cronogramaPreviaCorpo.append(table);
+            };
+            const operacaoLiberada = () => {
+                const valor = cronogramaEstado?.operacao?.liberada ?? cronogramaEstado?.operacao_liberada;
+                return valor === true || Number(valor || 0) > 0;
+            };
+            const invalidarRascunho = (mensagem = '') => {
+                if (!cronogramaRascunho) return;
+                cronogramaRascunho = null;
+                cronogramaGeracao++;
+                if (mensagem && resumoCronograma) resumoCronograma.textContent = mensagem;
+                renderizarPrevia();
+                atualizarAcoes();
+            };
+            const podeGerar = () => cronogramaEstadoConfiavel
+                && cronogramaEstado
+                && ['rascunho', 'revisao'].includes(String(cronogramaEstado.cronograma_status))
+                && String(cronogramaEstado.inscricoes_status || 'fechadas') !== 'abertas'
+                && !operacaoLiberada();
+            const calcularProgressoCronograma = (rascunhoAtual) => {
+                const publicado = Boolean(cronogramaEstado && cronogramaEstado.cronograma_status === 'publicado');
+                const emRevisao = Boolean(cronogramaEstado && cronogramaEstado.cronograma_status === 'revisao');
+                const liberado = operacaoLiberada();
+                const inscricoesAbertas = cronogramaEstado?.inscricoes_status === 'abertas';
+                const inscricoesEncerradas = cronogramaEstado?.inscricoes_status === 'encerradas';
+                const versaoAtual = Number(cronogramaEstado?.cronograma_versao || 0);
+
+                if (!cronogramaEstado || !cronogramaEstadoConfiavel) {
+                    return { etapaAtiva: 1, concluidas: [], emRevisao: false, liberado: false };
+                }
+                if (liberado) {
+                    return { etapaAtiva: 6, concluidas: [1, 2, 3, 4, 5, 6], emRevisao: false, liberado: true };
+                }
+                if (publicado) {
+                    if (inscricoesEncerradas) {
+                        return { etapaAtiva: 6, concluidas: [1, 2, 3, 4, 5], emRevisao: false, liberado: false };
+                    }
+                    if (inscricoesAbertas) {
+                        return { etapaAtiva: 5, concluidas: [1, 2, 3, 4], emRevisao: false, liberado: false };
+                    }
+                    return { etapaAtiva: 4, concluidas: [1, 2, 3], emRevisao: false, liberado: false };
+                }
+                if (rascunhoAtual) {
+                    return { etapaAtiva: 3, concluidas: [1, 2], emRevisao, liberado: false };
+                }
+                if (equipesPreparadasSessao || emRevisao || versaoAtual > 0 || Boolean(cronogramaRascunho)) {
+                    return { etapaAtiva: 2, concluidas: [1], emRevisao, liberado: false };
+                }
+                return { etapaAtiva: 1, concluidas: [], emRevisao, liberado: false };
+            };
+            const atualizarStepperCronograma = (rascunhoAtual) => {
+                const { etapaAtiva, concluidas, emRevisao, liberado } = calcularProgressoCronograma(rascunhoAtual);
+                for (let step = 1; step <= 6; step++) {
+                    const isCompleted = concluidas.includes(step);
+                    const isActive = !isCompleted && etapaAtiva === step;
+                    const isUpcoming = !isCompleted && !isActive;
+                    const textoEstado = isCompleted
+                        ? 'Concluída'
+                        : (isActive ? (emRevisao ? 'Em revisão' : 'Etapa atual') : 'Aguardando');
+
+                    const indicator = painelCronograma.querySelector(`[data-sgi-step-indicator="${step}"]`);
+                    if (indicator) {
+                        indicator.classList.toggle('sgi-stepper__item--completed', isCompleted);
+                        indicator.classList.toggle('sgi-stepper__item--active', isActive);
+                        indicator.classList.toggle('sgi-stepper__item--upcoming', isUpcoming);
+                        if (isActive || (liberado && step === 6)) {
+                            indicator.setAttribute('aria-current', 'step');
+                        } else {
+                            indicator.removeAttribute('aria-current');
+                        }
+                    }
+                    const meta = painelCronograma.querySelector(`[data-sgi-step-meta="${step}"]`);
+                    if (meta) {
+                        meta.textContent = textoEstado;
+                    }
+                    const card = painelCronograma.querySelector(`[data-sgi-step-card="${step}"]`);
+                    if (card) {
+                        card.classList.toggle('sgi-step-card--completed', isCompleted);
+                        card.classList.toggle('sgi-step-card--active', isActive);
+                        card.classList.toggle('sgi-step-card--upcoming', isUpcoming);
+                    }
+                    const badge = painelCronograma.querySelector(`[data-sgi-card-badge="${step}"]`);
+                    if (badge) {
+                        badge.textContent = textoEstado;
+                        badge.className = 'badge rounded-pill ' + (
+                            isCompleted
+                                ? 'bg-success-subtle text-success-emphasis'
+                                : (isActive ? 'text-bg-primary' : 'text-bg-light border text-body-secondary')
+                        );
+                    }
+                }
+                if (preparar) preparar.className = `btn ${etapaAtiva === 1 && !concluidas.includes(1) ? 'btn-primary' : 'btn-outline-primary'} btn-sm w-100`;
+                if (gerar) gerar.className = `btn ${etapaAtiva === 2 && !concluidas.includes(2) ? 'btn-primary' : 'btn-outline-primary'} btn-sm`;
+                if (botaoPublicar) botaoPublicar.className = `btn ${etapaAtiva === 3 && !concluidas.includes(3) ? 'btn-success' : 'btn-outline-success'} btn-sm w-100`;
+                if (botaoAbrir) botaoAbrir.className = `btn ${etapaAtiva === 4 && !concluidas.includes(4) ? 'btn-success' : 'btn-outline-success'} btn-sm`;
+                if (botaoFechar) botaoFechar.className = `btn ${etapaAtiva === 5 && !concluidas.includes(5) ? 'btn-primary' : 'btn-outline-secondary'} btn-sm w-100`;
+                if (botaoLiberar) botaoLiberar.className = `btn ${etapaAtiva === 6 && !concluidas.includes(6) ? 'btn-primary' : 'btn-outline-primary'} btn-sm w-100`;
+            };
+            const atualizarAcoes = () => {
+                const indisponivel = cronogramaEmProgresso || !cronogramaEstadoConfiavel || !cronogramaEstado;
+                const publicado = Boolean(cronogramaEstado && cronogramaEstado.cronograma_status === 'publicado');
+                const liberado = operacaoLiberada();
+                const inscricoesAbertas = cronogramaEstado?.inscricoes_status === 'abertas';
+                const inscricoesFechadas = cronogramaEstado?.inscricoes_status === 'fechadas';
+                const inscricoesEncerradas = cronogramaEstado?.inscricoes_status === 'encerradas';
+                const rascunhoAtual = cronogramaRascunho
+                    && cronogramaRascunho.cronograma_versao === Number(cronogramaEstado?.cronograma_versao || 0)
+                    && cronogramaRascunho.assinatura === assinaturaGeracao()
+                    && cronogramaRascunho.success === true
+                    && cronogramaRascunho.pendencias.length === 0;
+
+                if (preparar) preparar.disabled = indisponivel || !podeGerar();
+                if (gerar) gerar.disabled = indisponivel || !podeGerar();
+                if (botaoPublicar) botaoPublicar.disabled = indisponivel || !podeGerar() || !rascunhoAtual;
+                if (botaoAbrir) botaoAbrir.disabled = indisponivel || !publicado || liberado || inscricoesAbertas;
+                if (botaoFechar) botaoFechar.disabled = indisponivel || !publicado || liberado || (!inscricoesAbertas && !inscricoesFechadas);
+                if (botaoLiberar) botaoLiberar.disabled = indisponivel || !publicado || liberado || !inscricoesEncerradas;
+                if (botaoRevisar) botaoRevisar.disabled = indisponivel || !publicado || liberado;
+                if (botaoAtualizar) botaoAtualizar.disabled = cronogramaEmProgresso;
+                atualizarStepperCronograma(Boolean(rascunhoAtual));
+            };
+            const lerRespostaCronograma = async (response) => {
+                const text = await response.text();
+                let json;
+                try { json = JSON.parse(text); } catch (_) {
+                    throw new Error('O servidor retornou uma resposta inválida para o cronograma. Atualize o estado antes de continuar.');
+                }
+                if (!json || typeof json !== 'object' || Array.isArray(json)) {
+                    throw new Error('O servidor retornou uma resposta inválida para o cronograma. Atualize o estado antes de continuar.');
+                }
+                return json;
+            };
+
+            const mostrarCronograma = (mensagem = '') => {
+                if (!cronogramaEstado) { atualizarAcoes(); return; }
+                const agenda = cronogramaEstado.cronograma_status || 'rascunho';
+                const inscricoes = cronogramaEstado.inscricoes_status || 'fechadas';
+                let inscricoesExibidas = inscricoes;
+                if (inscricoes === 'abertas' && cronogramaEstado.inscricoes_status_efetivo === 'programadas') inscricoesExibidas = 'abertas · início programado';
+                if (inscricoes === 'abertas' && cronogramaEstado.inscricoes_status_efetivo === 'expiradas') inscricoesExibidas = 'abertas · prazo expirado';
+                if (inscricoes === 'abertas' && cronogramaEstado.inscricoes_status_efetivo === 'janela_invalida') inscricoesExibidas = 'abertas · período inválido';
+                if (campoInscricaoInicio && campoInscricaoInicio.dataset.userEdited !== 'true') {
+                    campoInscricaoInicio.value = valorDataHoraLocal(cronogramaEstado.inscricoes_abertura);
+                }
+                if (campoInscricaoFim && campoInscricaoFim.dataset.userEdited !== 'true') {
+                    campoInscricaoFim.value = valorDataHoraLocal(cronogramaEstado.inscricoes_encerramento);
+                }
+                if (statusCronograma) {
+                    statusCronograma.textContent = `${agenda} · inscrições ${inscricoesExibidas}`;
+                    statusCronograma.className = `badge ${inscricoes === 'abertas' && inscricoesExibidas === inscricoes ? 'text-bg-success' : agenda === 'publicado' ? 'text-bg-primary' : 'text-bg-secondary'}`;
+                }
+                if (resumoCronograma) {
+                    resumoCronograma.classList.remove('text-danger');
+                    const modalidades = Array.isArray(cronogramaEstado.modalidades) ? cronogramaEstado.modalidades.length : 0;
+                    const compromissos = Array.isArray(cronogramaEstado.compromissos) ? cronogramaEstado.compromissos.length : 0;
+                    resumoCronograma.textContent = mensagem || `${modalidades} modalidade(s), ${compromissos} compromisso(s), revisão ${Number(cronogramaEstado.cronograma_versao || 0)}.`;
+                }
+                renderizarPrevia();
+                atualizarAcoes();
+            };
+            const enviarCronograma = async (body) => {
+                const response = await fetch(`${API}cronograma`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, id_interclasse: cronogramaId }) });
+                const json = await lerRespostaCronograma(response);
+                const geracaoComPendencias = body.acao === 'gerar_rascunho' && json.success === false && Array.isArray(json.pendencias);
+                if (!response.ok || (json.success !== true && !geracaoComPendencias)) {
+                    const pending = Array.isArray(json.pendencias) ? json.pendencias.map((item) => item.mensagem || item.motivo).filter(Boolean).join(' ') : '';
+                    throw new Error([json.message, pending, `Operação recusada (HTTP ${response.status}).`].filter(Boolean).join(' '));
+                }
+                return json;
+            };
+            const atualizarCronograma = async () => {
+                const montagem = cronogramaMontagem;
+                try {
+                    const response = await fetch(`${API}cronograma?id_interclasse=${encodeURIComponent(cronogramaId)}`);
+                    const json = await lerRespostaCronograma(response);
+                    const estadoValido = Number.isInteger(Number(json.cronograma_versao))
+                        && ['rascunho', 'revisao', 'publicado'].includes(String(json.cronograma_status))
+                        && ['fechadas', 'abertas', 'encerradas'].includes(String(json.inscricoes_status));
+                    if (!response.ok || !estadoValido) throw new Error(json.message || `Não foi possível consultar o cronograma (HTTP ${response.status}).`);
+                    if (!pageScope.active || montagem !== cronogramaMontagem || !painelCronograma.isConnected) return false;
+                    cronogramaEstado = json;
+                    cronogramaEstadoConfiavel = true;
+                    if (cronogramaRascunho && (
+                        cronogramaRascunho.cronograma_versao !== Number(json.cronograma_versao || 0)
+                        || !['rascunho', 'revisao'].includes(String(json.cronograma_status))
+                    )) invalidarRascunho('O estado do cronograma mudou. Gere um rascunho novo antes de publicar.');
+                    mostrarCronograma();
+                    return true;
+                } catch (error) {
+                    if (!pageScope.active || montagem !== cronogramaMontagem || !painelCronograma.isConnected) return false;
+                    cronogramaEstadoConfiavel = false;
+                    atualizarAcoes();
+                    throw error;
+                }
+            };
+            const tratarErroCronograma = (error) => {
+                if (resumoCronograma) {
+                    resumoCronograma.classList.add('text-danger');
+                    resumoCronograma.textContent = error.message || 'Não foi possível processar o cronograma.';
+                }
+            };
+            const executarMutacaoCronograma = async (request, mensagem, confirmado = () => {}) => {
+                if (cronogramaEmProgresso || !cronogramaEstadoConfiavel) return;
+                const montagem = pageScope;
+                const geracaoMontagem = cronogramaMontagem;
+                cronogramaEmProgresso = true;
+                cronogramaEstadoConfiavel = false;
+                atualizarAcoes();
+                let operacaoConfirmada = false;
+                try {
+                    const result = await request();
+                    operacaoConfirmada = true;
+                    if (!montagem.active || geracaoMontagem !== cronogramaMontagem || !painelCronograma.isConnected) return;
+                    confirmado(result);
+                    await atualizarCronograma();
+                    mostrarCronograma(typeof mensagem === 'function' ? mensagem(result) : mensagem);
+                } catch (error) {
+                    if (!montagem.active || geracaoMontagem !== cronogramaMontagem || !painelCronograma.isConnected) return;
+                    let reconciliado = false;
+                    if (!operacaoConfirmada) {
+                        try { reconciliado = await atualizarCronograma(); } catch (_) {}
+                    }
+                    if (operacaoConfirmada) {
+                        tratarErroCronograma(new Error('A operação foi concluída, mas não foi possível atualizar o estado. Consulte o cronograma para continuar.'));
+                    } else if (reconciliado) {
+                        tratarErroCronograma(error);
+                    } else {
+                        tratarErroCronograma(new Error('Não foi possível confirmar a operação nem consultar o estado. Tente atualizar antes de continuar.'));
+                    }
+                } finally {
+                    if (montagem.active && geracaoMontagem === cronogramaMontagem && painelCronograma.isConnected) {
+                        cronogramaEmProgresso = false;
+                        atualizarAcoes();
+                    }
+                }
+            };
+            if (preparar) pageScope.listen(preparar, 'click', async () => {
+                invalidarRascunho('As equipes foram atualizadas. Gere um rascunho novo antes de publicar.');
+                await executarMutacaoCronograma(
+                    () => enviarCronograma({ acao: 'preparar_equipes' }),
+                    (result) => `${Number(result.equipes_criadas || 0)} equipe(s) criada(s); ${Number(result.equipes_existentes || 0)} já existente(s).`,
+                    () => { equipesPreparadasSessao = true; },
+                );
+            });
+            if (gerar) pageScope.listen(gerar, 'click', async () => {
+                if (cronogramaEmProgresso || !cronogramaEstadoConfiavel || !podeGerar()) return;
+                equipesPreparadasSessao = true;
+                const geracao = ++cronogramaGeracao;
+                const assinatura = assinaturaGeracao();
+                cronogramaEmProgresso = true;
+                atualizarAcoes();
+                try {
+                    const result = await enviarCronograma({
+                        acao: 'gerar_rascunho',
+                        data_inicio: campoInicio?.value,
+                        data_fim: campoFim?.value,
+                        hora_inicio: document.getElementById('cronogramaHoraInicio')?.value,
+                        hora_fim: document.getElementById('cronogramaHoraFim')?.value,
+                        duracao_min: Number(document.getElementById('cronogramaDuracao')?.value || 30)
+                    });
+                    if (!pageScope.active || !painelCronograma.isConnected) return;
+                    if (geracao !== cronogramaGeracao || assinatura !== assinaturaGeracao()) {
+                        tratarErroCronograma(new Error('Os parâmetros mudaram durante a geração. Gere o rascunho novamente.'));
+                        return;
+                    }
+                    cronogramaRascunho = {
+                        ...result,
+                        pendencias: Array.isArray(result.pendencias) ? result.pendencias : [],
+                        cronograma_versao: Number(result.cronograma_versao ?? cronogramaEstado.cronograma_versao ?? 0),
+                        assinatura,
+                    };
+                    renderizarPrevia();
+                    const pendencias = Array.isArray(result.pendencias) ? result.pendencias.length : 0;
+                    if (resumoCronograma) {
+                        const detalhes = cronogramaRascunho.pendencias.map((item) => item.mensagem || item.motivo).filter(Boolean).join(' ');
+                        resumoCronograma.classList.toggle('text-danger', pendencias > 0);
+                        resumoCronograma.textContent = `${Number(result.nos?.length || 0)} nó(s), ${Number(result.compromissos?.length || 0)} compromisso(s) gerado(s)${pendencias ? `; ${pendencias} pendência(s) bloqueiam a publicação. ${detalhes}` : '.'}`;
+                    }
+                } catch (error) {
+                    if (pageScope.active && painelCronograma.isConnected) {
+                        cronogramaRascunho = null;
+                        renderizarPrevia();
+                        tratarErroCronograma(error);
+                    }
+                } finally {
+                    if (pageScope.active && painelCronograma.isConnected) {
+                        cronogramaEmProgresso = false;
+                        atualizarAcoes();
+                    }
+                }
+            });
+            if (botaoPublicar) pageScope.listen(botaoPublicar, 'click', async () => {
+                const proposta = cronogramaRascunho;
+                if (!proposta || proposta.assinatura !== assinaturaGeracao()) return;
+                await executarMutacaoCronograma(
+                    () => enviarCronograma({ acao: 'publicar', cronograma_versao: proposta.cronograma_versao, compromissos: proposta.compromissos, nos: proposta.nos }),
+                    'Cronograma publicado. Defina a janela e abra as inscrições quando estiver pronto.',
+                    () => invalidarRascunho(),
+                );
+            });
+            if (botaoAbrir) pageScope.listen(botaoAbrir, 'click', async () => {
+                if (!cronogramaEstado) return;
+                await executarMutacaoCronograma(async () => {
+                    const inicio = document.getElementById('cronogramaInscricaoInicio')?.value;
+                    const fim = document.getElementById('cronogramaInscricaoFim')?.value;
+                    return enviarCronograma({ acao: 'abrir_inscricoes', cronograma_versao: Number(cronogramaEstado.cronograma_versao || 0), inscricoes_abertura: inicio, inscricoes_encerramento: fim });
+                }, 'Inscrições abertas na janela informada.', () => {
+                    if (campoInscricaoInicio) campoInscricaoInicio.dataset.userEdited = 'false';
+                    if (campoInscricaoFim) campoInscricaoFim.dataset.userEdited = 'false';
+                });
+            });
+            if (botaoFechar) pageScope.listen(botaoFechar, 'click', async () => {
+                if (!cronogramaEstado) return;
+                await executarMutacaoCronograma(
+                    () => enviarCronograma({ acao: 'encerrar_inscricoes', cronograma_versao: Number(cronogramaEstado.cronograma_versao || 0) }),
+                    'Inscrições encerradas.',
+                );
+            });
+            if (botaoLiberar) pageScope.listen(botaoLiberar, 'click', async () => {
+                if (!cronogramaEstado) return;
+                await executarMutacaoCronograma(async () => {
+                    const liberacao = await enviarCronograma({ acao: 'liberar_operacao', cronograma_versao: Number(cronogramaEstado.cronograma_versao || 0) });
+                    return liberacao;
+                }, (liberacao) => liberacao.idempotente
+                    ? 'A competição já estava liberada; os jogos mantêm a árvore e os horários publicados.'
+                    : `Competição liberada após validar os elencos. ${Number(liberacao.jogos_criados || 0)} confronto(s) inicial(is) pronto(s).`,
+                () => {
+                    invalidarRascunho();
+                });
+            });
+            if (botaoRevisar) pageScope.listen(botaoRevisar, 'click', async () => {
+                if (!cronogramaEstado || cronogramaEstado.cronograma_status !== 'publicado') return;
+                invalidarRascunho();
+                await executarMutacaoCronograma(async () => {
+                    const revisada = await enviarCronograma({ acao: 'revisar', cronograma_versao: Number(cronogramaEstado.cronograma_versao || 0) });
+                    return revisada;
+                }, (revisada) => `${Number(revisada.equipes_incompletas?.length || 0)} equipe(s) precisam de resolução antes da nova publicação.`);
+            });
+            camposGeracao.forEach((campo) => {
+                const alterar = () => invalidarRascunho('Os parâmetros mudaram. Gere um rascunho novo antes de publicar.');
+                pageScope.listen(campo, 'input', alterar);
+                pageScope.listen(campo, 'change', alterar);
+            });
+            if (botaoAtualizar) pageScope.listen(botaoAtualizar, 'click', async () => {
+                if (cronogramaEmProgresso) return;
+                const geracaoMontagem = cronogramaMontagem;
+                try {
+                    cronogramaEmProgresso = true;
+                    atualizarAcoes();
+                    await atualizarCronograma();
+                } catch (error) { tratarErroCronograma(error); }
+                finally {
+                    if (!pageScope.active || geracaoMontagem !== cronogramaMontagem || !painelCronograma.isConnected) return;
+                    cronogramaEmProgresso = false;
+                    atualizarAcoes();
+                }
+            });
+            atualizarAcoes();
+            atualizarCronograma().catch(tratarErroCronograma);
+        }
 
         function navegarMes(delta) {
             dataNavegacao.setMonth(dataNavegacao.getMonth() + delta);
@@ -928,48 +1402,6 @@ window.SGIPage.mount("eventos/configurar-agenda", function (pageConfig, pageScop
             }
         });
 
-        /* ── AGENDAMENTO AUTOMÁTICO EM SESSÕES ── */
-        let agendaSequencialAtual = null;
-        let diasSequenciaisAdicionados = [];
-
-        function dataLocalISO(date) {
-            return ymd(date);
-        }
-
-        function dataSessaoInicial() {
-            const hoje = new Date();
-            const distancia = (1 - hoje.getDay() + 7) % 7; // segunda-feira
-            hoje.setDate(hoje.getDate() + distancia);
-            return dataLocalISO(hoje);
-        }
-
-        function valorDiasSequenciais() {
-            const inicio = document.getElementById('seq-inicio').value;
-            const fim = document.getElementById('seq-fim').value || '11:30';
-            const local = Number(document.getElementById('seq-local').value);
-            return [{
-                data: document.getElementById('seq-data').value,
-                inicio,
-                fim,
-                local
-            }, ...diasSequenciaisAdicionados];
-        }
-
-        function payloadSequencial(acao) {
-            return {
-                acao,
-                id_interclasse: Number(interclasseAtual && interclasseAtual.id_interclasse),
-                id_modalidade: Number(document.getElementById('auto-modalidade').value),
-                todos_jogos: true,
-                reprogramar: Boolean(document.getElementById('seq-reprogramar').checked),
-                dias: valorDiasSequenciais(),
-                opcoes: {
-                    duracao_min: Number(document.getElementById('seq-duracao').value),
-                    intervalo_troca_min: 10
-                }
-            };
-        }
-
         async function lerRespostaJson(response) {
             const text = await response.text();
             if (!text) return {};
@@ -980,150 +1412,6 @@ window.SGIPage.mount("eventos/configurar-agenda", function (pageConfig, pageScop
                 return {};
             }
         }
-
-        function invalidarPreviaSequencial() {
-            if (!agendaSequencialAtual) return;
-            agendaSequencialAtual = null;
-            if (btnSeqConfirmar) btnSeqConfirmar.disabled = true;
-            const area = document.getElementById('seq-previa');
-            if (area) {
-                area.classList.remove('text-danger');
-                area.textContent = 'Os dados foram alterados. Clique em “Calcular prévia” novamente.';
-            }
-        }
-
-        function atualizarProximoDia(bloco) {
-            const painel = document.getElementById('seq-proximo-dia');
-            const campoData = document.getElementById('seq-proxima-data');
-            const campoInicio = document.getElementById('seq-proxima-inicio');
-            const campoFim = document.getElementById('seq-proxima-fim');
-            if (!painel || !campoData || !campoInicio || !campoFim) return;
-            const proximo = bloco.proximo_dia_sugerido || null;
-            const pendente = Array.isArray(bloco.pendencias) && bloco.pendencias.length > 0;
-            painel.classList.toggle('d-none', !pendente || !proximo);
-            if (pendente && proximo) {
-                campoData.value = proximo;
-                campoData.min = hojeISO();
-                campoInicio.value = bloco.proximo_inicio_sugerido || '08:00:00';
-                campoFim.value = bloco.proximo_termino_sugerido || '11:30';
-            }
-        }
-
-        function renderPreviaSequencial(bloco) {
-            const area = document.getElementById('seq-previa');
-            if (!area) return;
-            const linhas = (bloco.proposta || []).map((item) => `<div>${escapeHtml(formatNomeJogo(item.chave_tag))}: ${item.data_jogo} ${formatarHora(item.inicio_jogo)}–${formatarHora(item.termino_jogo)} · ${escapeHtml(String(item.locais_id_local))}</div>`).join('');
-            const pendencias = (bloco.pendencias || []).map((item) => `<div class="text-danger">${escapeHtml(formatNomeJogo(item.chave_tag))}: ${escapeHtml(item.motivo)}</div>`).join('');
-            const resumo = bloco.resumo || {};
-            area.innerHTML = `<strong>${Number(resumo.encaixados || 0)} jogo(s) programado(s)</strong>${linhas}${pendencias ? `<hr><strong class="text-danger">Pendências</strong>${pendencias}` : '<div class="text-success mt-1">Todos os jogos da chave possuem horário.</div>'}`;
-            atualizarProximoDia(bloco);
-        }
-
-        function preencherModalSequencial() {
-            diasSequenciaisAdicionados = [];
-            agendaSequencialAtual = null;
-            const data = document.getElementById('seq-data');
-            if (data) { data.min = hojeISO(); data.value = dataSessaoInicial(); }
-            const fim = document.getElementById('seq-fim');
-            if (fim) fim.value = '11:30';
-            const inicio = document.getElementById('seq-inicio');
-            if (inicio) inicio.value = '08:00';
-            const local = document.getElementById('seq-local');
-            if (local && local.options.length > 0) local.value = local.options[0].value;
-            const reprogramar = document.getElementById('seq-reprogramar');
-            if (reprogramar) reprogramar.checked = false;
-            const area = document.getElementById('seq-previa');
-            if (area) {
-                area.classList.remove('text-danger');
-                area.textContent = 'Preencha os dados e clique em “Calcular prévia”.';
-            }
-            const painel = document.getElementById('seq-proximo-dia');
-            if (painel) painel.classList.add('d-none');
-            const confirmar = document.getElementById('seq-salvar-btn');
-            if (confirmar) confirmar.disabled = true;
-        }
-
-        document.querySelectorAll('.btn-trigger-datas-auto').forEach((btn) => {
-            pageScope.listen(btn, 'click', () => {
-                preencherModalSequencial();
-                const modalMod = document.getElementById('auto-modalidade');
-                const selModGlobal = modalidadeSelecionadaId();
-                if (modalMod && selModGlobal) modalMod.value = selModGlobal;
-                const modal = new bootstrap.Modal(document.getElementById('modalDatasAutomaticas'));
-                modal.show();
-            });
-        });
-
-        const btnSeqSimular = document.getElementById('seq-simular-btn');
-        const btnSeqConfirmar = document.getElementById('seq-salvar-btn');
-        ['auto-modalidade', 'seq-data', 'seq-inicio', 'seq-fim', 'seq-local', 'seq-duracao', 'seq-reprogramar',
-            'seq-proxima-data', 'seq-proxima-inicio', 'seq-proxima-fim'].forEach((id) => {
-            const field = document.getElementById(id);
-            if (!field) return;
-            pageScope.listen(field, 'input', invalidarPreviaSequencial);
-            pageScope.listen(field, 'change', invalidarPreviaSequencial);
-        });
-        if (btnSeqSimular) pageScope.listen(btnSeqSimular, 'click', async () => {
-            if (btnSeqSimular.disabled) return;
-            btnSeqSimular.disabled = true;
-            btnSeqSimular.setAttribute('aria-busy', 'true');
-            try {
-                const payload = payloadSequencial('simular_sequencial');
-                if (!payload.id_modalidade) throw new Error('Selecione uma modalidade.');
-                if (!payload.dias[0].data || !payload.dias[0].inicio || !payload.dias[0].fim || !payload.dias[0].local) throw new Error('Informe a data, o horário e o local do primeiro jogo.');
-                if (!Number.isInteger(payload.opcoes.duracao_min) || payload.opcoes.duracao_min <= 0) throw new Error('Informe uma duração válida para os jogos.');
-                const response = await fetch(`${API}agenda-blocos`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                const json = await lerRespostaJson(response);
-                if (!response.ok || json.success === false) throw new Error(json.message || `Não foi possível calcular a prévia (HTTP ${response.status}).`);
-                agendaSequencialAtual = { ...payload, revisao: json.revisao };
-                const area = document.getElementById('seq-previa');
-                if (area) area.classList.remove('text-danger');
-                renderPreviaSequencial(json);
-                if (btnSeqConfirmar) btnSeqConfirmar.disabled = (json.pendencias || []).length > 0;
-            } catch (error) {
-                const area = document.getElementById('seq-previa');
-                agendaSequencialAtual = null;
-                if (area) {
-                    area.classList.add('text-danger');
-                    area.textContent = error.message || 'Erro na prévia.';
-                }
-                if (btnSeqConfirmar) btnSeqConfirmar.disabled = true;
-            } finally {
-                btnSeqSimular.disabled = false;
-                btnSeqSimular.removeAttribute('aria-busy');
-            }
-        });
-
-        const btnAdicionarDia = document.getElementById('seq-adicionar-dia');
-        if (btnAdicionarDia) pageScope.listen(btnAdicionarDia, 'click', async () => {
-            const data = document.getElementById('seq-proxima-data').value;
-            const inicio = document.getElementById('seq-proxima-inicio').value;
-            const fim = document.getElementById('seq-proxima-fim').value || '11:30';
-            const local = Number(document.getElementById('seq-local').value);
-            if (!data || !inicio || !local) { SGI.alert('Informe a data, o horário e o local da próxima sessão.'); return; }
-            diasSequenciaisAdicionados.push({ data, inicio, fim, local });
-            document.getElementById('seq-proximo-dia').classList.add('d-none');
-            if (btnSeqSimular) btnSeqSimular.click();
-        });
-
-        if (btnSeqConfirmar) pageScope.listen(btnSeqConfirmar, 'click', async () => {
-            if (!agendaSequencialAtual) return;
-            btnSeqConfirmar.disabled = true;
-            try {
-                const payload = { ...agendaSequencialAtual, acao: 'confirmar_sequencial', idempotencia: `agenda-sequencial-${Date.now()}-${Math.random().toString(16).slice(2)}` };
-                const response = await fetch(`${API}agenda-blocos`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                const json = await lerRespostaJson(response);
-                if (!response.ok || json.success === false) throw new Error(json.message || `Não foi possível confirmar a agenda (HTTP ${response.status}).`);
-                bootstrap.Modal.getInstance(document.getElementById('modalDatasAutomaticas')).hide();
-                agendaSequencialAtual = null;
-                await carregarJogosDoInterclasse();
-                atualizarTelas();
-                SGI.alert(`${json.programados || 0} jogo(s) programado(s) com sucesso.`);
-            } catch (error) {
-                SGI.alert(error.message || 'Não foi possível confirmar a agenda.');
-                btnSeqConfirmar.disabled = false;
-            }
-        });
 
     });
 })();

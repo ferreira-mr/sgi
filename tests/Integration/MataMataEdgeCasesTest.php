@@ -56,12 +56,12 @@ final class MataMataEdgeCasesTest
             ]);
             Assertions::assertJsonSuccess('Elenco da equipe ímpar ' . ($index + 1), $linked);
         }
-        $generated = $admin->postJson('api/v1/chaveamentos', ['id_modalidade' => $modality]);
-        Assertions::assertJsonSuccess('Geração de chaveamento com três equipes e elenco', $generated);
-        Assertions::assert('Chaveamento ímpar registra um avanço automático inicial', (int) ($generated['json']['bye_inicial'] ?? 0) === 1);
+        $generation = $admin->postJson('api/v1/chaveamentos', ['id_modalidade' => $modality]);
+        Assertions::assertStatus('API antiga de geração exige o calendário canônico', $generation, 409);
+        Assertions::assert('API antiga retorna código estável para a geração removida', ($generation['json']['code'] ?? null) === 'CHAVEAMENTO_DEVE_VIR_DO_CRONOGRAMA');
         $old = $admin->get("api/v1/chaveamentos?id_modalidade=$modality");
         $new = $admin->get("api/v1/chaveamentos?id_modalidade=$modality");
-        Assertions::assert('Árvore versionada preserva jogos e avanços da URL antiga', is_array($old['json']['jogos'] ?? null) && $new['json'] === $old['json']);
+        Assertions::assert('Pedido antigo não grava jogos e a consulta permanece estável', ($old['json']['jogos'] ?? null) === [] && $new['json'] === $old['json']);
         Assertions::assertStatus('Mesário não pode recriar chaveamento coletivo', $mesario->postJson('api/v1/chaveamentos', ['id_modalidade' => $modality]), 403);
         $history = $admin->get("api/v1/chaveamentos?id_modalidade=$modality&acao=historico");
         $classification = $admin->get("api/v1/chaveamentos?id_modalidade=$modality&acao=classificacao");

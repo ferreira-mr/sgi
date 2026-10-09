@@ -130,5 +130,15 @@ class AuthAndRbacTest
         Assertions::assertStatus('Logout por GET não altera a sessão', $resLogoutGet, 405);
         $resLogout = $client->postJson('api/v1/logout', []);
         Assertions::assert("Execução de logout limpo", $resLogout['code'] === 200 || $resLogout['code'] === 302);
+
+        $resLogoutAluno = $clientAluno->request('api/v1/logout', 'POST', '', [], false);
+        $sessaoAlunoDepoisLogout = $clientAluno->get('api/v1/session');
+        Assertions::assert(
+            'Logout do aluno encaminha ao login próprio e destrói a sessão',
+            ($resLogoutAluno['code'] ?? 0) === 302
+            && str_ends_with((string) ($resLogoutAluno['headers']['Location'] ?? ''), '/login')
+            && in_array(($sessaoAlunoDepoisLogout['code'] ?? 0), [401, 403], true),
+            json_encode(['logout' => $resLogoutAluno['code'] ?? 0, 'sessao' => $sessaoAlunoDepoisLogout['code'] ?? 0], JSON_UNESCAPED_UNICODE),
+        );
     }
 }

@@ -18,6 +18,13 @@ final class MysqliCronometroRepository implements CronometroRepository
     {
         $statement = $this->connection->prepare(
             'SELECT j.status_jogo, j.data_jogo, j.inicio_jogo, j.termino_jogo, j.locais_id_local,
+                    CASE WHEN j.nome_jogo LIKE \'MM:%\'
+                          AND CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(j.nome_jogo, \':\', 2), \':\', -1) AS UNSIGNED) < (
+                              SELECT MAX(CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(fase.nome_jogo, \':\', 2), \':\', -1) AS UNSIGNED))
+                              FROM jogos fase
+                              WHERE fase.modalidades_id_modalidade = j.modalidades_id_modalidade
+                                AND fase.nome_jogo LIKE \'MM:%\'
+                          ) THEN 0 ELSE 1 END AS exige_horario_agendado,
                     duracao_jogo, tempo_extra_jogo, tempo_restante_jogo,
                     UNIX_TIMESTAMP(j.data_inicio_real) AS data_inicio_epoch,
                     m.tipos_modalidades_id_tipo_modalidade, tm.nome_tipo_modalidade
@@ -45,6 +52,7 @@ final class MysqliCronometroRepository implements CronometroRepository
             'inicio_jogo' => $row['inicio_jogo'],
             'termino_jogo' => $row['termino_jogo'],
             'locais_id_local' => $row['locais_id_local'] === null ? null : (int) $row['locais_id_local'],
+            'exige_horario_agendado' => (bool) $row['exige_horario_agendado'],
             'duracao_jogo' => $row['duracao_jogo'],
             'tempo_extra_jogo' => $row['tempo_extra_jogo'],
             'tempo_restante_jogo' => $row['tempo_restante_jogo'],

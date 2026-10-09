@@ -77,7 +77,7 @@ $ptcTheme = [
             <span class="badge text-bg-warning d-none" id="ptcUnsaved">
                 <i class="bi bi-exclamation-circle-fill"></i> Alterações não salvas
             </span>
-            <button type="button" class="btn btn-outline-secondary d-inline-flex align-items-center gap-2" id="btnRestaurarPadrao" onclick="restaurarPadrao()" disabled>
+            <button type="button" class="btn btn-outline-secondary d-inline-flex align-items-center gap-2" id="btnRestaurarPadrao" disabled>
                 <i class="bi bi-arrow-counterclockwise"></i> Restaurar Padrão
             </button>
             <button type="button" class="btn btn-primary d-inline-flex align-items-center gap-2" id="btnSalvarPontuacao" disabled>

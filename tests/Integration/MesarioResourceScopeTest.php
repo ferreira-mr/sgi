@@ -21,6 +21,8 @@ final class MesarioResourceScopeTest
         $fixture = AuditFixtures::createAuthorizationFixture($connection);
         $editionA = $fixture['by_edition']['A'];
         $editionB = $fixture['by_edition']['B'];
+        $editionAId = (int) $editionA['interclasse_id'];
+        $editionBId = (int) $editionB['interclasse_id'];
         $occurrenceUserA = (int) $editionA['atleta_ids'][0];
         $occurrenceGameA = (int) $editionA['jogo_ids'][0];
         $occurrenceClassA = (int) $editionA['turma_ids'][0];
@@ -58,6 +60,70 @@ final class MesarioResourceScopeTest
         try {
             $mesario = new TestClient();
             $mesario->login('mesario', '123');
+
+            $historyGameId = (int) $editionA['jogo_ids'][0];
+            $completeHistoryGame = $connection->prepare("UPDATE jogos SET status_jogo = 'Concluido' WHERE id_jogo = ?");
+            $completeHistoryGame->bind_param('i', $historyGameId);
+            $completeHistoryGame->execute();
+            $completeHistoryGame->close();
+            $defaultOperationalGames = $mesario->get('api/v1/jogos?id_interclasse=' . $editionBId);
+            $attemptedOperationalOverride = $mesario->get('api/v1/jogos?operacional=0&id_interclasse=' . $editionBId);
+            $competitionGames = $mesario->get('api/v1/jogos?visao=chaveamento&id_interclasse=' . $editionBId);
+            $invalidGamesView = $mesario->get('api/v1/jogos?visao=qualquer');
+            $competitionGamesPayload = is_array($competitionGames['json'] ?? null) ? $competitionGames['json'] : [];
+            $competitionGameIds = array_map(
+                static fn (array $game): int => (int) ($game['id_jogo'] ?? 0),
+                $competitionGamesPayload,
+            );
+            $competitionEditionIds = array_values(array_unique(array_map(
+                static fn (array $game): int => (int) ($game['id_interclasse'] ?? 0),
+                $competitionGamesPayload,
+            )));
+            $admin = new TestClient();
+            $admin->login('admin', '123');
+            $adminHistoryGames = $admin->get('api/v1/jogos?visao=chaveamento&id_interclasse=' . $editionAId);
+            $studentClient = new TestClient();
+            $studentClient->login('2879', '123');
+            $studentCompetitionGames = $studentClient->get('api/v1/jogos?visao=chaveamento');
+            $restoreHistoryGame = $connection->prepare("UPDATE jogos SET status_jogo = 'Agendado' WHERE id_jogo = ?");
+            $restoreHistoryGame->bind_param('i', $historyGameId);
+            $restoreHistoryGame->execute();
+            $restoreHistoryGame->close();
+            Assertions::assert(
+                'Histórico do mesário ignora o filtro operacional, mas fixa a edição ativa no servidor',
+                $competitionGames['code'] === 200
+                && in_array($historyGameId, $competitionGameIds, true)
+                && !in_array((int) $editionB['jogo_ids'][0], $competitionGameIds, true)
+                && $competitionEditionIds === [$editionAId]
+                && ($defaultOperationalGames['code'] ?? 0) === 200
+                && !in_array($historyGameId, array_map(
+                    static fn (array $game): int => (int) ($game['id_jogo'] ?? 0),
+                    is_array($defaultOperationalGames['json'] ?? null) ? $defaultOperationalGames['json'] : [],
+                ), true)
+                && !in_array($historyGameId, array_map(
+                    static fn (array $game): int => (int) ($game['id_jogo'] ?? 0),
+                    is_array($attemptedOperationalOverride['json'] ?? null) ? $attemptedOperationalOverride['json'] : [],
+                ), true),
+                json_encode(['history' => $competitionGames, 'operational' => $defaultOperationalGames, 'override' => $attemptedOperationalOverride], JSON_UNESCAPED_UNICODE),
+            );
+            Assertions::assert(
+                'Visão não documentada de jogos é rejeitada',
+                ($invalidGamesView['code'] ?? 0) === 400
+                && ($invalidGamesView['json']['success'] ?? true) === false,
+            );
+            Assertions::assert(
+                'Administrador mantém consulta do histórico explicitamente selecionada',
+                ($adminHistoryGames['code'] ?? 0) === 200
+                && in_array($historyGameId, array_map(
+                    static fn (array $game): int => (int) ($game['id_jogo'] ?? 0),
+                    is_array($adminHistoryGames['json'] ?? null) ? $adminHistoryGames['json'] : [],
+                ), true),
+            );
+            Assertions::assert(
+                'Aluno não pode pedir a visão histórica do chaveamento',
+                $studentCompetitionGames['code'] === 403
+                && ($studentCompetitionGames['json']['success'] ?? true) === false,
+            );
 
             $beforeBMatch = self::partida($connection, $partidaIdB);
             $pointsB = $mesario->get('api/v1/pontos?id_jogo=' . $gameId);
@@ -126,7 +192,6 @@ final class MesarioResourceScopeTest
                 && ($missingPoints['json']['success'] ?? true) === false,
             );
 
-            $editionAId = (int) $fixture['by_edition']['A']['interclasse_id'];
             $disableEdition = $connection->prepare("UPDATE interclasses SET status_interclasse = '0' WHERE id_interclasse = ?");
             $disableEdition->bind_param('i', $editionAId);
             $disableEdition->execute();

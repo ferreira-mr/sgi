@@ -438,6 +438,45 @@ for (const body of ['<html>Servidor em manutenção</html>', '', '{"success":', 
     });
 }
 
+test('falha de rede mantém a mutação e o retry reutiliza a mesma identidade', async ({ page }) => {
+    const tentativas = [];
+    await page.route('**/api/v1/partidas', async route => {
+        const requisicao = route.request();
+        const headers = requisicao.headers();
+        tentativas.push({
+            body: requisicao.postData(),
+            mutationId: headers['x-sgi-mutation-id'],
+        });
+        if (tentativas.length === 1) {
+            await route.abort('failed');
+            return;
+        }
+        await route.fulfill({ json: { success: true } });
+    });
+
+    const falha = await page.evaluate(async () => {
+        await SGIOffline.queueMutation('PUT', '/api/v1/partidas', JSON.stringify({
+            id_partida: 84,
+            resultado_partida: 3,
+        }), { 'Content-Type': 'application/json' });
+        const sync = await SGIOffline.syncNow();
+        return { sync, fila: await SGIOffline.getPendingList() };
+    });
+
+    expect(falha.sync.failed).toBe(1);
+    expect(falha.fila).toHaveLength(1);
+    expect(falha.fila[0].tries).toBe(1);
+    expect(falha.fila[0].needsReview).toBe(false);
+    expect(falha.fila[0].retryable).toBe(true);
+
+    const retry = await page.evaluate(() => SGIOffline.syncNow());
+    expect(retry.synced).toBe(1);
+    expect(await page.evaluate(() => SGIOffline.getPendingList())).toEqual([]);
+    expect(tentativas).toHaveLength(2);
+    expect(tentativas[0].body).toBe(JSON.stringify({ id_partida: 84, resultado_partida: 3 }));
+    expect(tentativas[1]).toEqual(tentativas[0]);
+});
+
 test('confirmação no formato status sucesso continua compatível', async ({ page }) => {
     await page.route('**/api/v1/usuarios', route => route.fulfill({ json: { status: 'sucesso' } }));
     const fila = await page.evaluate(async () => {

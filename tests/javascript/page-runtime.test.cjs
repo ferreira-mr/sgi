@@ -84,3 +84,29 @@ test('reactivating a screen neither duplicates handlers nor keeps global events 
     events.get('click').forEach(fn => fn());
     assert.equal(clicks, 2);
 });
+
+test('mesário recebe aviso amigável ao tentar atualizar com atalho do teclado', () => {
+    const events = new Map();
+    const document = {
+        readyState: 'complete',
+        querySelector: () => null,
+        addEventListener: (type, callback) => events.set(type, callback),
+    };
+    const notices = [];
+    const window = {
+        SGI_SESSION_NIVEL: 2,
+        SGI: { showToast: (...args) => notices.push(args) },
+        setTimeout: callback => callback(),
+    };
+    vm.runInNewContext(source, { window, document });
+
+    let prevented = false;
+    let stopped = false;
+    events.get('keydown')({ key: 'F5', preventDefault: () => { prevented = true; }, stopPropagation: () => { stopped = true; } });
+
+    assert.equal(prevented, true);
+    assert.equal(stopped, true);
+    assert.equal(notices[0][1], 'info');
+    assert.equal(notices[0][2].delay, 5000);
+    assert.match(notices[0][0], /não atualize esta página/i);
+});

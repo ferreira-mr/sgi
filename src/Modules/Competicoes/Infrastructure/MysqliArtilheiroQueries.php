@@ -87,7 +87,7 @@ final class MysqliArtilheiroQueries
             ORDER BY c.nome_categoria ASC, m.nome_modalidade ASC, total_gols DESC, total_acoes DESC";
         $stmt = $conn->prepare($sql);
         if ($stmt === false) {
-            throw new \RuntimeException('Não foi possível consultar os alunos destaque por modalidade.');
+            throw new \RuntimeException('Não foi possível consultar os estudantes em destaque por modalidade.');
         }
         if ($idInterclasse) {
             $stmt->bind_param("i", $idInterclasse);
@@ -132,7 +132,7 @@ final class MysqliArtilheiroQueries
             ORDER BY c.nome_categoria ASC, total_gols DESC, total_acoes DESC";
         $stmt = $conn->prepare($sql);
         if ($stmt === false) {
-            throw new \RuntimeException('Não foi possível consultar os alunos destaque.');
+            throw new \RuntimeException('Não foi possível consultar os estudantes em destaque.');
         }
         $stmt->execute();
         $res = $stmt->get_result();

@@ -74,7 +74,7 @@ $paginaAtiva = 'dashboard';
     </div>
 </main>
 
-<button type="button" class="mc-fab sgi-placar-fab btn btn-primary rounded-circle shadow position-fixed bottom-0 end-0 mb-5 me-4 d-inline-flex align-items-center justify-content-center z-3" id="btnNovaOcorrencia" onclick="abrirModalOcorrencia()" title="Nova ocorrência" aria-label="Registrar nova ocorrência">
+<button type="button" class="mc-fab sgi-placar-fab btn btn-primary rounded-circle shadow position-fixed bottom-0 end-0 mb-5 me-4 d-inline-flex align-items-center justify-content-center z-3" id="btnNovaOcorrencia" title="Nova ocorrência" aria-label="Registrar nova ocorrência">
     <i class="bi bi-plus-lg fs-5" aria-hidden="true"></i>
 </button>
 
@@ -86,7 +86,7 @@ $paginaAtiva = 'dashboard';
                 <h2 class="modal-title fs-5" id="modalOcorrenciaLabel">Nova ocorrência</h2>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar ocorrência"></button>
             </div>
-            <form id="formOcorrencia" onsubmit="return salvarOcorrencia(event)">
+            <form id="formOcorrencia">
                 <div class="modal-body">
                     <div class="mb-3">
                         <fieldset class="border-0 p-0 m-0">
@@ -115,12 +115,12 @@ $paginaAtiva = 'dashboard';
                     </div>
                     <div class="mb-3">
                         <label class="form-label" for="filtroTurmaOcorrencia">Turma</label>
-                        <select class="form-select" id="filtroTurmaOcorrencia" onchange="carregarAlunosOcorrencia()">
+                        <select class="form-select" id="filtroTurmaOcorrencia">
                             <option value="">Selecione a turma</option>
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label" for="selectAlunoOcorrencia">Aluno</label>
+                        <label class="form-label" for="selectAlunoOcorrencia">Estudante</label>
                         <select class="form-select" id="selectAlunoOcorrencia" required disabled>
                             <option value="">Selecione uma turma primeiro</option>
                         </select>
@@ -159,16 +159,16 @@ $paginaAtiva = 'dashboard';
                 <h2 class="modal-title fs-5" id="modalArtilheiroLabel"><i class="bi bi-trophy-fill me-1 text-warning" aria-hidden="true"></i>Registrar ponto</h2>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar registro de ponto"></button>
             </div>
-            <form id="formArtilheiro" onsubmit="return salvarPonto(event)">
+            <form id="formArtilheiro">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label" for="selectEquipeArtilheiro">Equipe</label>
-                        <select class="form-select" id="selectEquipeArtilheiro" onchange="carregarAlunosArtilheiro()">
+                        <select class="form-select" id="selectEquipeArtilheiro">
                             <option value="">Selecione a equipe</option>
                         </select>
                     </div>
                     <div class="mb-2">
-                        <label class="form-label" for="selectAlunoArtilheiro">Aluno responsável pela jogada</label>
+                        <label class="form-label" for="selectAlunoArtilheiro">Estudante responsável pela jogada</label>
                         <select class="form-select" id="selectAlunoArtilheiro" aria-required="true">
                             <option value="">Selecione uma equipe primeiro</option>
                         </select>

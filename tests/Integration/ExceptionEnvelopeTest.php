@@ -187,7 +187,7 @@ final class ExceptionEnvelopeTest
         ini_set('error_log', $logPath);
         try {
             $failingRepository = new class () implements InscricaoRepository {
-                public function subscribe(int $userId, int $editionId, array $teamIds): array
+                public function subscribe(int $userId, int $editionId, array $teamIds, ?int $expectedRevision = null, ?int $expectedPublishedVersion = null): array
                 {
                     throw new \RuntimeException('N07_SQL_MARKER C:/synthetic/private/MysqliInscricaoRepository.php:77 #0');
                 }
@@ -246,8 +246,8 @@ final class ExceptionEnvelopeTest
                 '{"id_interclasse":0,"id_equipes":[]}',
             ));
             Assertions::assert(
-                'Dados inválidos de inscrição continuam com HTTP 400 e mensagem pública',
-                $invalidInput->status() === 400
+                'Dados inválidos de inscrição usam HTTP 422 e mensagem pública',
+                $invalidInput->status() === 422
                     && (self::decode($invalidInput->body())['message'] ?? '') === 'id_interclasse e id_equipes são obrigatórios.',
                 $invalidInput->body(),
             );

@@ -13,7 +13,8 @@ window.SGIPage.mount("competicoes/modalidades", function (pageConfig, pageScope)
         if (nivelUsuario !== 0) return '';
         const id = encodeURIComponent(String(modalidade.id_modalidade));
         const interclasse = encodeURIComponent(String(idInterclasse));
-        return '<div class="d-flex gap-1 ms-2">'
+        return '<div class="d-flex gap-1 ms-2 flex-shrink-0">'
+            + '<button type="button" class="btn btn-sm btn-outline-warning" data-sgi-action="gerenciar-podio" data-id-modalidade="' + esc(modalidade.id_modalidade) + '" data-nome-modalidade="' + esc(modalidade.nome_modalidade) + '" title="Pódio da modalidade" aria-label="Gerenciar pódio"><i class="bi bi-award"></i></button>'
             + '<a class="btn btn-sm btn-outline-primary" href="' + APP_BASE + '/modalidades/detalhes?id=' + interclasse + '&id_modalidade=' + id + '" title="Editar" aria-label="Editar modalidade"><i class="bi bi-pencil"></i></a>'
             + '<button type="button" class="btn btn-sm btn-outline-danger" data-sgi-action="delete-modalidade" data-id-modalidade="' + esc(modalidade.id_modalidade) + '" title="Excluir" aria-label="Excluir modalidade"><i class="bi bi-trash"></i></button>'
             + '</div>';
@@ -24,8 +25,10 @@ window.SGIPage.mount("competicoes/modalidades", function (pageConfig, pageScope)
         const divDesktop = document.getElementById('listaModalidadesDesktop');
 
         try {
-            const response = await axios.get(`${API_BASE}/modalidades?x=1`);
-            let modalidades = response.data.data || response.data;
+            const res = await fetch(`${API_BASE}/modalidades?x=1`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const raw = await res.json();
+            let modalidades = raw.data || raw;
             if (!Array.isArray(modalidades)) modalidades = [];
             modalidades = modalidades.filter((item) => String(item.interclasses_id_interclasse) === String(idInterclasse));
 
@@ -53,11 +56,11 @@ window.SGIPage.mount("competicoes/modalidades", function (pageConfig, pageScope)
             Object.keys(modalidadesPorCategoria).forEach((categoria) => {
                 const mods = modalidadesPorCategoria[categoria];
 
-                htmlMobile += '<h5 class="mt-4 mb-3 text-muted px-3">' + esc(categoria) + '</h5>';
+                htmlMobile += '<h5 class="mt-4 mb-3 text-muted px-3 w-100">' + esc(categoria) + '</h5>';
                 htmlMobile += mods.map((modalidade) =>
-                    '<div class="bg-white d-flex align-items-center shadow py-3 px-4 mb-3 border border-1 rounded-3 w-100 mw-100" >'
-                        + '<i class="bi bi-trophy fs-4" aria-hidden="true"></i>'
-                        + '<div class="text-start px-3 w-100">'
+                    '<div class="bg-white d-flex align-items-center shadow-sm py-3 px-3 mb-3 border border-1 rounded-3 w-100">'
+                        + '<i class="bi bi-trophy fs-4 flex-shrink-0" aria-hidden="true"></i>'
+                        + '<div class="text-start px-2 flex-grow-1 sgi-u-min-width-0">'
                             + '<h2 class="m-0 fs-5 text-truncate">' + esc(modalidade.nome_modalidade) + '</h2>'
                         + '</div>'
                         + botoesAdmin(modalidade)
@@ -85,6 +88,12 @@ window.SGIPage.mount("competicoes/modalidades", function (pageConfig, pageScope)
             if (divDesktop) divDesktop.innerHTML = htmlDesktop;
         } catch (error) {
             console.error('Erro ao carregar lista:', error);
+            const msgErro = '<div class="alert alert-danger my-3" role="alert">Não foi possível carregar as modalidades.</div>';
+            if (divMobile) divMobile.innerHTML = msgErro;
+            if (divDesktop) divDesktop.innerHTML = msgErro;
+            if (window.SGI && typeof window.SGI.showToast === 'function') {
+                window.SGI.showToast('Não foi possível carregar as modalidades.', 'danger');
+            }
         }
     }
 
@@ -93,8 +102,9 @@ window.SGIPage.mount("competicoes/modalidades", function (pageConfig, pageScope)
         if (!selectTipo) return;
 
         try {
-            const response = await axios.get(`${API_BASE}/tipos-modalidade`);
-            const tipos = response.data;
+            const res = await fetch(`${API_BASE}/tipos-modalidade`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const tipos = await res.json();
 
             const placeholder = new Option('Selecione um tipo...', '');
             placeholder.disabled = true;
@@ -116,8 +126,9 @@ window.SGIPage.mount("competicoes/modalidades", function (pageConfig, pageScope)
         if (!selectCat) return;
 
         try {
-            const response = await axios.get(`${API_BASE}/categorias?id_interclasse=${idInterclasse}`);
-            const categorias = response.data;
+            const res = await fetch(`${API_BASE}/categorias?id_interclasse=${idInterclasse}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const categorias = await res.json();
 
             const placeholder = new Option('Selecione uma categoria...', '');
             placeholder.disabled = true;
@@ -138,11 +149,16 @@ window.SGIPage.mount("competicoes/modalidades", function (pageConfig, pageScope)
         if (!await SGI.confirm({ titulo: 'Excluir modalidade?', mensagem: 'Esta ação não pode ser desfeita.', textoConfirmar: 'Excluir modalidade', destrutivo: true })) return;
 
         try {
-            const res = await axios.put(`${API_BASE}/modalidades`, {
-                id_modalidade: id,
-                status_modalidade: '0'
+            const res = await fetch(`${API_BASE}/modalidades`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id_modalidade: id,
+                    status_modalidade: '0'
+                })
             });
-            if (res.data.success) {
+            const data = await res.json();
+            if (res.ok && data.success) {
                 carregarModalidades();
             } else {
                 SGI.alert('Erro ao excluir modalidade.');
@@ -174,9 +190,14 @@ window.SGIPage.mount("competicoes/modalidades", function (pageConfig, pageScope)
         try {
             btnSalvar.disabled = true;
             btnSalvar.innerHTML = 'Salvando...';
-            const res = await axios.post(`${API_BASE}/modalidades`, dados);
+            const res = await fetch(`${API_BASE}/modalidades`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dados)
+            });
+            const data = await res.json();
 
-            if (res.data.success) {
+            if (res.ok && data.success) {
                 caixaMensagem.innerHTML = '<p class="text-success text-center fw-bold">Criada com sucesso!</p>';
                 document.getElementById('formNovaModalidade').reset();
                 carregarModalidades();
@@ -184,6 +205,8 @@ window.SGIPage.mount("competicoes/modalidades", function (pageConfig, pageScope)
                     bootstrap.Modal.getInstance(document.getElementById('modalCriarModalidade')).hide();
                     caixaMensagem.innerHTML = '';
                 }, 1000);
+            } else {
+                throw new Error(data?.message || 'Erro ao salvar.');
             }
         } catch (error) {
             caixaMensagem.innerHTML = '<p class="text-danger text-center fw-bold">Erro ao salvar.</p>';
@@ -193,12 +216,136 @@ window.SGIPage.mount("competicoes/modalidades", function (pageConfig, pageScope)
         }
     });
 
+    let modalidadePodioAtual = null;
+
+    async function abrirModalPodio(idModalidade, nomeModalidade) {
+        modalidadePodioAtual = idModalidade;
+        const modalEl = document.getElementById('modalGerenciarPodio');
+        if (!modalEl) return;
+
+        const subtitulo = document.getElementById('podioNomeModalidade');
+        if (subtitulo) subtitulo.textContent = 'Modalidade: ' + (nomeModalidade || '');
+
+        const selects = [
+            document.getElementById('selectPodio1'),
+            document.getElementById('selectPodio2'),
+            document.getElementById('selectPodio3')
+        ];
+        selects.forEach(function (s) {
+            if (s) {
+                s.innerHTML = '<option value="">Carregando equipes...</option>';
+                s.disabled = true;
+            }
+        });
+
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+
+        try {
+            const [resEquipes, resPodio] = await Promise.all([
+                fetch(API_BASE + '/equipes?id_modalidade=' + encodeURIComponent(idModalidade)).then(r => r.json()),
+                fetch(API_BASE + '/podios?id_interclasse=' + encodeURIComponent(idInterclasse) + '&id_modalidade=' + encodeURIComponent(idModalidade)).then(r => r.json())
+            ]);
+
+            const equipes = Array.isArray(resEquipes.data) ? resEquipes.data : (Array.isArray(resEquipes) ? resEquipes : []);
+            const podio = (resPodio && resPodio.podio) || [];
+
+            selects.forEach(function (select, idx) {
+                if (!select) return;
+                select.innerHTML = '';
+                const optVazia = document.createElement('option');
+                optVazia.value = '';
+                optVazia.textContent = 'Nenhuma equipe selecionada';
+                select.appendChild(optVazia);
+
+                equipes.forEach(function (eq) {
+                    const opt = document.createElement('option');
+                    opt.value = String(eq.id_equipe);
+                    opt.textContent = eq.nome_equipe + (eq.nome_turma ? ' (' + eq.nome_turma + ')' : '');
+                    select.appendChild(opt);
+                });
+
+                select.disabled = false;
+
+                const posNum = idx + 1;
+                const posAtual = podio.find(function (p) { return Number(p.posicao) === posNum; });
+                if (posAtual && posAtual.id_equipe) {
+                    select.value = String(posAtual.id_equipe);
+                }
+            });
+        } catch (err) {
+            console.error('Erro ao carregar dados do pódio:', err);
+            SGI.alert('Erro ao carregar equipes da modalidade.');
+        }
+    }
+
+    const formPodio = document.getElementById('formGerenciarPodio');
+    if (formPodio) {
+        pageScope.listen(formPodio, 'submit', async function (e) {
+            e.preventDefault();
+            if (!modalidadePodioAtual) return;
+            const btnSalvar = document.getElementById('btnSalvarPodio');
+            const s1 = document.getElementById('selectPodio1') ? document.getElementById('selectPodio1').value : '';
+            const s2 = document.getElementById('selectPodio2') ? document.getElementById('selectPodio2').value : '';
+            const s3 = document.getElementById('selectPodio3') ? document.getElementById('selectPodio3').value : '';
+
+            const podioData = [];
+            if (s1) podioData.push({ posicao: 1, id_equipe: parseInt(s1, 10) });
+            if (s2) podioData.push({ posicao: 2, id_equipe: parseInt(s2, 10) });
+            if (s3) podioData.push({ posicao: 3, id_equipe: parseInt(s3, 10) });
+
+            if (podioData.length === 0) {
+                SGI.alert('Selecione pelo menos uma equipe para o pódio.');
+                return;
+            }
+
+            try {
+                if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.textContent = 'Salvando...'; }
+                const response = await fetch(API_BASE + '/podios', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id_interclasse: parseInt(idInterclasse, 10),
+                        id_modalidade: parseInt(modalidadePodioAtual, 10),
+                        podio: podioData
+                    })
+                });
+                const res = await response.json();
+
+                if (response.ok && res && res.success) {
+                    SGI.alert(res.message || 'Pódio salvo com sucesso!');
+                    const modalEl = document.getElementById('modalGerenciarPodio');
+                    if (modalEl) {
+                        const inst = bootstrap.Modal.getInstance(modalEl);
+                        if (inst) inst.hide();
+                    }
+                } else {
+                    throw new Error((res && res.message) || 'Falha ao salvar pódio.');
+                }
+            } catch (err) {
+                const msg = err.message || 'Erro ao salvar pódio.';
+                SGI.alert(msg);
+            } finally {
+                if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.textContent = 'Salvar Pódio'; }
+            }
+        });
+    }
+
     function vincularEventosLista() {
         [document.getElementById('listaModalidadesMobile'), document.getElementById('listaModalidadesDesktop')]
-            .forEach((container) => pageScope.listen(container, 'click', (event) => {
-                const button = event.target.closest('[data-sgi-action="delete-modalidade"]');
-                if (button) excluirModalidade(button.dataset.idModalidade);
-            }));
+            .forEach(function (container) {
+                pageScope.listen(container, 'click', function (event) {
+                    const delButton = event.target.closest('[data-sgi-action="delete-modalidade"]');
+                    if (delButton) {
+                        excluirModalidade(delButton.dataset.idModalidade);
+                        return;
+                    }
+                    const podioButton = event.target.closest('[data-sgi-action="gerenciar-podio"]');
+                    if (podioButton) {
+                        abrirModalPodio(podioButton.dataset.idModalidade, podioButton.dataset.nomeModalidade);
+                    }
+                });
+            });
     }
 
     window.SGIPage.ready( async () => {
@@ -224,5 +371,5 @@ window.SGIPage.mount("competicoes/modalidades", function (pageConfig, pageScope)
         ]);
     });
 
-return {carregarModalidades, carregarTiposModalidades, carregarCategoriasModalidades, excluirModalidade};
+return {carregarModalidades, carregarTiposModalidades, carregarCategoriasModalidades, excluirModalidade, abrirModalPodio};
 });

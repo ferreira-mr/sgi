@@ -12,6 +12,15 @@ Para uploads, o PHP precisa de um `upload_tmp_dir` existente e gravável pelo us
 
 Crie um banco vazio e configure `SGI_DB_*`. Execute `php bin/sgi.php schema:install`. O comando aplica `database/schema-inicial.sql`; `php bin/sgi.php migrate` também instala o baseline quando necessário e aplica migrations futuras. Uma base parcial ou sem o marcador do baseline, com tabelas inesperadas, é recusada para evitar instalação sobre dados não previstos; bases já marcadas continuam aceitando tabelas criadas por migrations futuras.
 
+Para habilitar o cronograma antes das inscrições, execute `php bin/sgi.php migrate`
+ após o backup e confirme a aplicação de `001_cronograma_inscricoes.sql` e
+ `002_cronograma_nos.sql`. No
+painel, informe a quantidade de equipes/entradas por turma em cada modalidade,
+prepare as equipes vazias, gere e revise a grade e publique-a antes de abrir as
+inscrições. Para alterar uma agenda publicada, use a revisão: ela fecha as
+inscrições, preserva a versão suspensa e exige nova publicação. Em uma instalação
+deste produto a migration deve estar aplicada antes do primeiro uso.
+
 Para a primeira conta, informe `SGI_ADMIN_LOGIN`, `SGI_ADMIN_NAME` e `SGI_ADMIN_PASSWORD` somente no ambiente do comando `php bin/sgi.php admin:create`. A senha precisa ter pelo menos 12 caracteres e é persistida com `password_hash`. A rotina não substitui administradores existentes.
 
 Os dados de demonstração em `database/seeders/test.sql` pertencem aos testes. Não os carregue em produção.

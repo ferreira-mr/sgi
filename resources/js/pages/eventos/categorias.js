@@ -310,6 +310,15 @@ window.SGIPage.mount("eventos/categorias", function (pageConfig, pageScope) {
             }
         };
 
+        ['btnEditarCategoriaMobile', 'btnEditarCategoriaDesktop'].forEach((id) => {
+            const btnEdit = document.getElementById(id);
+            if (btnEdit) pageScope.listen(btnEdit, 'click', (ev) => window.abrirModalEditarCategoria(ev));
+        });
+        ['btnExcluirCategoriaMobile', 'btnExcluirCategoriaDesktop'].forEach((id) => {
+            const btnDel = document.getElementById(id);
+            if (btnDel) pageScope.listen(btnDel, 'click', () => window.excluirCategoria());
+        });
+
         // -- Admin: upload e criação com retomada segura --
         const formNovaTurma = document.getElementById('formNovaTurmaCategoria');
         const campoArquivoTurma = document.getElementById('arquivoUpload');

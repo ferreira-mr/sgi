@@ -35,3 +35,7 @@ docs/turmas
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Local LAN homologation secrets
+/.env.homologacao
+/test-results-*/

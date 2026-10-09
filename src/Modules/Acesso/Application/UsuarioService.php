@@ -55,7 +55,7 @@ final class UsuarioService
     public function atribuirAluno(int $userId, int $classId, int $editionId): void
     {
         if ($userId <= 0 || $classId <= 0 || $editionId <= 0) {
-            throw new RuntimeException('Dados de vínculo do aluno inválidos.');
+            throw new RuntimeException('Dados de vínculo do estudante inválidos.');
         }
         $this->usuarios->assignStudent($userId, $classId, $editionId);
     }

@@ -6,9 +6,15 @@ const vm = require('node:vm');
 function carregarChaveamento(config = { value3: 0 }) {
     const source = fs.readFileSync('resources/js/pages/competicoes/chaveamento.js', 'utf8');
     let api;
+    const stats = new Map([
+        'statModalidades', 'statModalidadesMob',
+        'statJogos', 'statJogosMob',
+        'statCampeoes', 'statCampeoesMob',
+        'statPendentes', 'statPendentesMob',
+    ].map((id) => [id, { textContent: '' }]));
     const document = {
         createElement: () => ({ textContent: '', innerHTML: '' }),
-        getElementById: () => null,
+        getElementById: (id) => stats.get(id) || null,
         querySelector: () => null,
         querySelectorAll: () => [],
         addEventListener: () => {},
@@ -39,6 +45,7 @@ function carregarChaveamento(config = { value3: 0 }) {
         clearTimeout,
         console,
     });
+    api.__testStats = stats;
     return api;
 }
 
@@ -130,12 +137,65 @@ test('administrador e colaborador continuam vendo opção de editar jogo no card
     assert.match(htmlColab, /Editar/);
 });
 
+test('fase posterior herdada permite iniciar sem horário', () => {
+    const mesario = carregarChaveamento({ value3: 2, podeEditar: false });
+    const jogo = { ...JOGO_AGENDADO, id_jogo: 104, inicio_jogo: null, termino_jogo: null, exige_horario_agendado: false };
+
+    const html = mesario._renderBracketMatch(jogo);
+
+    assert.match(html, /href="\/jogos\/placar\?id_jogo=104"/);
+    assert.match(html, /Iniciar/);
+});
+
+test('fase formada offline permite iniciar sem agenda e mantém o nome da equipe online', () => {
+    const mesario = carregarChaveamento({ value3: 2, podeEditar: false });
+    const jogo = {
+        ...JOGO_SEM_DATA,
+        id_jogo: -104,
+        _offline_liberado: true,
+        exige_horario_agendado: false,
+        equipes: [
+            { id_equipe: 1, nome_equipe: 'Equipe de Vôlei', nome_turma: '3º Ano A', gols: 0 },
+            { id_equipe: 2, nome_equipe: 'Equipe de Vôlei', nome_turma: '1º Ano B', gols: 0 },
+        ],
+    };
+
+    const html = mesario._renderBracketMatch(jogo);
+
+    assert.match(html, /href="\/jogos\/placar\?id_jogo=-104"/);
+    assert.match(html, /Iniciar/);
+    assert.match(html, /Equipe de Vôlei/);
+});
+
 test('aluno não pode editar jogos no chaveamento', () => {
     const aluno = carregarChaveamento({ value3: 3, podeEditar: false });
     assert.equal(aluno.podeEditarJogo(), false);
 
     const htmlAluno = aluno._renderBracketMatch(JOGO_AGENDADO);
     assert.doesNotMatch(htmlAluno, /Editar/);
+});
+
+test('chaveamento consome a árvore PL publicada sem ação de geração separada', () => {
+    const source = fs.readFileSync('resources/js/pages/competicoes/chaveamento.js', 'utf8');
+    const chaveamento = carregarChaveamento({ value3: 0, podeEditar: true });
+    const nome = chaveamento.formatarNomePartida({
+        nome_jogo: 'PL:71:0:MM:2:0:N',
+        nome_tipo_modalidade: 'Mata-Mata',
+    });
+    assert.match(nome, /Final/);
+    assert.doesNotMatch(source, /btnGerarChaveamento|gerarChaveamento/);
+
+    const previsto = chaveamento._renderBracketMatch({
+        id_jogo: -3,
+        nome_jogo: 'PL:71:0:MM:2:0:N',
+        status_jogo: 'Previsto',
+        virtual_planejado: true,
+        fase_nivel: 2,
+        nome_fase: 'Final',
+        equipes: [],
+    });
+    assert.match(previsto, /Previsto/);
+    assert.doesNotMatch(previsto, /\/jogos\/placar\?id_jogo=-3|Editar Jogo/);
 });
 
 test('tabela de histórico de jogos oculta botão de edição para mesário e mantém para admin', () => {
@@ -150,6 +210,64 @@ test('tabela de histórico de jogos oculta botão de edição para mesário e ma
     assert.match(linhaAdmin, /href="\/jogos\/placar\?id_jogo=102"/);
     assert.match(linhaAdmin, /title="Editar Jogo"/);
     assert.match(linhaAdmin, /onclick="editarJogo\(this\)"/);
+});
+
+test('conta campeões pela fase e resultado estruturados, incluindo tags PL e ranking individual', () => {
+    const chaveamento = carregarChaveamento();
+    const modalidades = [
+        { id_modalidade: 96, nome_tipo_modalidade: 'Mata-Mata' },
+        { id_modalidade: 97, nome_tipo_modalidade: 'Mata-Mata' },
+        { id_modalidade: 98, nome_tipo_modalidade: 'Individual' },
+        { id_modalidade: 99, nome_tipo_modalidade: 'Individual' },
+    ];
+    const final = {
+        nome_jogo: 'PL:96:0:MM:2:0:N',
+        fase_nivel: 2,
+        status_jogo: 'Concluido',
+        equipe_vencedora_id: 601,
+        equipes: [{ id_equipe: 601 }, { id_equipe: 602 }],
+    };
+    const resultados = new Map([
+        ['96', { success: true, jogos: [final, final] }],
+        ['97', { success: true, jogos: [{ ...final, equipe_vencedora_id: null }] }],
+        ['98', { success: true, jogo: { status_jogo: 'Concluido' }, ranking: [{ posicao: 1, id_usuario: 701 }, { posicao: 2, id_usuario: 702 }] }],
+        ['99', { success: true, jogo: { status_jogo: 'Iniciado' }, ranking: [{ posicao: 1, id_usuario: 801 }] }],
+    ]);
+
+    assert.deepEqual(
+        Array.from(chaveamento._contarCampeoesConfirmados(modalidades, resultados)),
+        ['96', '98'],
+    );
+
+    chaveamento.atualizarStats([
+        { id_jogo: 1, status_jogo: 'Concluido', equipes_nomes: 'A vs B' },
+        { id_jogo: 2, status_jogo: 'Finalizado', equipes_nomes: 'C vs D' },
+        { id_jogo: 3, status_jogo: 'Agendado', equipes_nomes: 'E vs F' },
+        { id_jogo: -4, status_jogo: 'Concluido', equipes_nomes: 'G vs H' },
+        { id_jogo: 5, status_jogo: 'Concluido', equipes_nomes: 'bye sem oponente' },
+    ], new Set(['96', '98']));
+    assert.equal(chaveamento.__testStats.get('statJogos').textContent, 3);
+    assert.equal(chaveamento.__testStats.get('statPendentes').textContent, 1);
+    assert.equal(chaveamento.__testStats.get('statCampeoes').textContent, 2);
+});
+
+test('duração programada usa segundos e não combina datetime real com fim agendado', () => {
+    const chaveamento = carregarChaveamento();
+    const base = {
+        status_jogo: 'Concluido',
+        data_jogo: '2026-09-24',
+        data_inicio_real: '2026-09-24 08:00:00',
+        termino_jogo: '08:05:00',
+    };
+
+    assert.equal(chaveamento.formatarDuracaoJogo({ ...base, duracao_jogo: 300 }), '5min');
+    assert.equal(chaveamento.formatarDuracaoJogo({ ...base, duracao_jogo: 65 }), '1min 5s');
+    assert.equal(chaveamento.formatarDuracaoJogo({ ...base, duracao_jogo: 3600 }), '1h');
+    assert.equal(chaveamento.formatarDuracaoJogo({ ...base, duracao_jogo: 3661 }), '1h 1min 1s');
+    for (const duracao of [null, 0, 'invalido', Infinity, -1]) {
+        assert.equal(chaveamento.formatarDuracaoJogo({ ...base, duracao_jogo: duracao }), '—');
+    }
+    assert.equal(chaveamento.formatarDuracaoJogo({ ...base, status_jogo: 'Agendado', duracao_jogo: 300 }), '—');
 });
 
 test('funções de edição de jogo retornam silenciosamente sem permissão', () => {

@@ -18,12 +18,12 @@ final class MysqliUsuarioAdministrativoRepository implements UsuarioAdministrati
     {
         $statement = $this->connection->prepare("UPDATE usuarios SET status_usuario = '0', auth_version = auth_version + 1 WHERE id_usuario = ? AND nivel_usuario = '3'");
         if ($statement === false) {
-            throw new RuntimeException('Não foi possível remover aluno.');
+            throw new RuntimeException('Não foi possível remover estudante.');
         }
         $statement->bind_param('i', $id);
         if (!$statement->execute()) {
             $statement->close();
-            throw new RuntimeException('Não foi possível remover aluno.');
+            throw new RuntimeException('Não foi possível remover estudante.');
         }
         $found = $statement->affected_rows > 0 || $this->hasStudent($id);
         $statement->close();
@@ -34,12 +34,12 @@ final class MysqliUsuarioAdministrativoRepository implements UsuarioAdministrati
     {
         $statement = $this->connection->prepare("UPDATE usuarios SET senha_usuario = ?, senha_troca_pendente = 1, auth_version = auth_version + 1 WHERE id_usuario = ? AND nivel_usuario = '3'");
         if ($statement === false) {
-            throw new RuntimeException('Não foi possível resetar senha de aluno.');
+            throw new RuntimeException('Não foi possível resetar senha de estudante.');
         }
         $statement->bind_param('si', $hash, $id);
         if (!$statement->execute()) {
             $statement->close();
-            throw new RuntimeException('Não foi possível resetar senha de aluno.');
+            throw new RuntimeException('Não foi possível resetar senha de estudante.');
         }
         $found = $statement->affected_rows > 0 || $this->hasStudent($id);
         $statement->close();

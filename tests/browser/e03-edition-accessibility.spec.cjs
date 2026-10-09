@@ -45,7 +45,7 @@ async function verificarControleRotulado(escopo, id, nome) {
 test.describe('E03 — nomes acessíveis em pontuação, agenda e modalidades', () => {
     test.beforeEach(async ({ page }) => entrarComoAdmin(page));
 
-    test('pontuação, filtros da agenda e modais de agendamento têm nomes associados', async ({ page }) => {
+    test('pontuação, filtros e cronograma planejado têm nomes associados', async ({ page }) => {
         const idEdicao = await obterIdEdicao(page);
         await page.goto(`edicoes/pontuacao?id=${idEdicao}&modo=view`, { waitUntil: 'domcontentloaded' });
 
@@ -78,27 +78,26 @@ test.describe('E03 — nomes acessíveis em pontuação, agenda e modalidades', 
             await verificarControleRotulado(page, id, nome);
         }
 
-        const modalAutomatico = page.locator('#modalDatasAutomaticas');
-        const abrirAutomatico = page.locator('.btn-trigger-datas-auto:visible').first();
-        await esperarModalAberto(abrirAutomatico, modalAutomatico);
-        const dialogoAutomatico = page.getByRole('dialog', { name: 'Agendamento automático' });
-        await expect(dialogoAutomatico).toBeVisible();
-        await dialogoAutomatico.locator('#seq-proximo-dia').evaluate((elemento) => elemento.classList.remove('d-none'));
+        const painelCronograma = page.locator('#painelCronogramaPlanejado');
+        await expect(painelCronograma).toBeVisible();
         for (const [id, nome] of [
-            ['auto-modalidade', 'Modalidade'],
-            ['seq-data', 'Primeiro dia'],
-            ['seq-inicio', 'Horário do primeiro jogo'],
-            ['seq-fim', 'Limite para terminar os jogos'],
-            ['seq-local', 'Local'],
-            ['seq-duracao', 'Duração média de cada jogo (minutos)'],
-            ['seq-proxima-data', 'Próximo dia'],
-            ['seq-proxima-inicio', 'Horário inicial'],
-            ['seq-proxima-fim', 'Limite'],
+            ['cronogramaDataInicio', 'Primeiro dia'],
+            ['cronogramaDataFim', 'Último dia'],
+            ['cronogramaHoraInicio', 'Início'],
+            ['cronogramaHoraFim', 'Fim'],
+            ['cronogramaDuracao', 'Duração (min)'],
+            ['cronogramaInscricaoInicio', 'Abertura das inscrições'],
+            ['cronogramaInscricaoFim', 'Encerramento das inscrições'],
         ]) {
-            await verificarControleRotulado(dialogoAutomatico, id, nome);
+            await verificarControleRotulado(painelCronograma, id, nome);
         }
-        await page.keyboard.press('Escape');
-        await expect(modalAutomatico).toBeHidden();
+        for (const nome of [
+            'Preparar equipes', 'Gerar rascunho', 'Publicar cronograma', 'Abrir inscrições',
+            'Encerrar inscrições', 'Liberar competição', 'Reabrir revisão', 'Atualizar estado',
+        ]) {
+            await expect(painelCronograma.getByRole('button', { name: nome, exact: true })).toHaveCount(1);
+        }
+        await expect(page.locator('#modalDatasAutomaticas')).toHaveCount(0);
 
         await page.evaluate(() => bootstrap.Modal.getOrCreateInstance(
             document.getElementById('modalEditarJogoAgenda')
@@ -137,10 +136,10 @@ test.describe('E03 — nomes acessíveis em pontuação, agenda e modalidades', 
         }
         await esperarModalFechado(modalConfiguracao);
 
-        const botaoDestaques = page.getByRole('button', { name: /Alunos Destaques/ });
+        const botaoDestaques = page.getByRole('button', { name: /Estudantes em destaque/ });
         const modalDestaques = page.locator('#modalDestaques');
         await esperarModalAberto(botaoDestaques, modalDestaques);
-        await expect(page.getByRole('dialog', { name: 'Alunos Destaques' })).toBeVisible();
+        await expect(page.getByRole('dialog', { name: 'Estudantes em destaque' })).toBeVisible();
         await esperarModalFechado(modalDestaques);
 
         await page.setViewportSize({ width: 390, height: 844 });

@@ -46,7 +46,7 @@ final class InMemoryInscricaoRepository implements InscricaoRepository
 
     public int $editionId = 0;
 
-    public function subscribe(int $userId, int $editionId, array $teamIds): array
+    public function subscribe(int $userId, int $editionId, array $teamIds, ?int $expectedRevision = null, ?int $expectedPublishedVersion = null): array
     {
         $this->userId = $userId;
         $this->editionId = $editionId;

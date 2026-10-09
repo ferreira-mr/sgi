@@ -57,7 +57,7 @@ final class PartidaController
             if (array_key_exists('resultado_final', $data) || array_key_exists('resultado_partida', $data)) {
                 return Response::json([
                     'success' => false,
-                    'message' => 'O placar só pode ser alterado por uma jogada vinculada a um atleta.',
+                    'message' => 'O placar só pode ser alterado por uma jogada vinculada a um estudante.',
                 ], 422);
             }
             if (!is_numeric($id) || (int) $id <= 0) {
@@ -113,7 +113,7 @@ final class PartidaController
             if (array_key_exists('resultado_partida', $data)) {
                 return Response::json([
                     'success' => false,
-                    'message' => 'O placar só pode ser alterado por uma jogada vinculada a um atleta.',
+                    'message' => 'O placar só pode ser alterado por uma jogada vinculada a um estudante.',
                 ], 422);
             }
             if (!is_numeric($id) || (int) $id <= 0) {

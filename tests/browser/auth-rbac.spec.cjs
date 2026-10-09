@@ -85,7 +85,7 @@ test.describe('Autenticação, RBAC e Segurança de Rotas', () => {
         ]) {
             await page.goto(path, { waitUntil: 'domcontentloaded' });
             await expect(page).toHaveURL(/\/painel(?:\?|$)/);
-            await expect(page.locator('body')).not.toContainText('Alunos da turma');
+            await expect(page.locator('body')).not.toContainText('Estudantes da turma');
         }
     });
 
@@ -158,13 +158,100 @@ test.describe('Autenticação, RBAC e Segurança de Rotas', () => {
         await expect(logoutLink).toBeVisible();
         await logoutLink.click();
         await expect(page.getByRole('dialog')).toContainText(/Sair do SGI/i);
+        await page.getByRole('dialog').getByRole('button', { name: 'Cancelar' }).click();
+        await expect(page.getByRole('dialog')).toBeHidden();
+        const sessaoAposCancelar = await page.evaluate(async () => {
+            const response = await fetch(`${window.SGI_API_BASE}session`, { credentials: 'same-origin' });
+            return { status: response.status, payload: await response.json() };
+        });
+        expect(sessaoAposCancelar.status).toBe(200);
+        expect(sessaoAposCancelar.payload.success).toBe(true);
+
+        const logoutPost = page.waitForRequest((request) =>
+            request.url().includes('/api/v1/logout') && request.method() === 'POST',
+        );
+        await logoutLink.click();
+        await expect(page.getByRole('dialog')).toContainText(/Sair do SGI/i);
         await page.getByRole('dialog').getByRole('button', { name: 'Sair' }).click();
+        const requisicaoLogout = await logoutPost;
+        expect(requisicaoLogout.headers()['x-sgi-csrf']).toBeTruthy();
 
         // 3. Confirmar que redirecionou para tela de login
         await page.waitForURL(/login/, { timeout: 15_000 });
         await expect(page.locator('#form_desktop')).toBeVisible();
 
         // 4. Tentar acessar página interna diretamente após logout
+        await page.goto('edicoes', { waitUntil: 'domcontentloaded' });
+        await expect(page).toHaveURL(/login/);
+    });
+
+    test('falha no POST de logout mantém a sessão e permite tentar novamente', async ({ page }) => {
+        await page.goto('login', { waitUntil: 'domcontentloaded' });
+        await page.locator('#form_desktop .ipt-matricula').fill('admin');
+        await page.locator('#form_desktop .ipt-senha').fill('123');
+        await page.locator('#form_desktop button[type="submit"]').click();
+        await page.waitForURL(/\/edicoes/, { timeout: 15_000 });
+
+        let tentativasPost = 0;
+        await page.route('**/api/v1/logout', async (route) => {
+            if (route.request().method() === 'POST') {
+                tentativasPost += 1;
+                if (tentativasPost === 1) {
+                    await route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ success: false }) });
+                } else if (tentativasPost === 2) {
+                    await route.abort('failed');
+                } else if (tentativasPost === 3) {
+                    await route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html><body>login</body></html>' });
+                } else {
+                    await route.continue();
+                }
+                return;
+            }
+            await route.continue();
+        });
+        const logoutLink = page.locator('a[href*="api/v1/logout"]:visible');
+        await logoutLink.click();
+        await page.getByRole('dialog').getByRole('button', { name: 'Sair' }).click();
+        const erro = page.getByRole('dialog', { name: 'Não foi possível sair' });
+        await expect(erro).toContainText('A sessão continua ativa', { timeout: 10_000 });
+        expect(tentativasPost).toBe(1);
+        await expect(page).toHaveURL(/\/edicoes/);
+        const sessaoAposFalha = await page.evaluate(async () => {
+            const response = await fetch(`${window.SGI_API_BASE}session`, { credentials: 'same-origin' });
+            return { status: response.status, payload: await response.json() };
+        });
+        expect(sessaoAposFalha.status).toBe(200);
+        expect(sessaoAposFalha.payload.success).toBe(true);
+
+        await erro.getByRole('button', { name: 'Entendi' }).click();
+        await logoutLink.click();
+        await page.getByRole('dialog').getByRole('button', { name: 'Sair' }).click();
+        await expect(erro).toContainText('A sessão continua ativa', { timeout: 10_000 });
+        expect(tentativasPost).toBe(2);
+        await expect(page).toHaveURL(/\/edicoes/);
+        const sessaoAposFalhaDeRede = await page.evaluate(async () => {
+            const response = await fetch(`${window.SGI_API_BASE}session`, { credentials: 'same-origin' });
+            return { status: response.status, payload: await response.json() };
+        });
+        expect(sessaoAposFalhaDeRede.status).toBe(200);
+        expect(sessaoAposFalhaDeRede.payload.success).toBe(true);
+
+        await erro.getByRole('button', { name: 'Entendi' }).click();
+        await logoutLink.click();
+        await page.getByRole('dialog').getByRole('button', { name: 'Sair' }).click();
+        await expect(erro).toContainText('A sessão continua ativa', { timeout: 10_000 });
+        expect(tentativasPost).toBe(3);
+        await expect(page).toHaveURL(/\/edicoes/);
+
+        await erro.getByRole('button', { name: 'Entendi' }).click();
+        const retryPost = page.waitForRequest((request) =>
+            request.url().includes('/api/v1/logout') && request.method() === 'POST',
+        );
+        await logoutLink.click();
+        await page.getByRole('dialog').getByRole('button', { name: 'Sair' }).click();
+        await retryPost;
+        await expect.poll(() => tentativasPost).toBe(4);
+        await page.waitForURL(/login/, { timeout: 15_000 });
         await page.goto('edicoes', { waitUntil: 'domcontentloaded' });
         await expect(page).toHaveURL(/login/);
     });

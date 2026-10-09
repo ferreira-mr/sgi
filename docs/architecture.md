@@ -91,6 +91,14 @@ ficam fora dessa lista e só recebem serviços, contratos e adaptadores de HTTP.
   padrão) e aceita diretórios configuráveis por `SGI_*_DIR`.
 - O modo offline do mesário usa IDs temporários negativos e a fila IndexedDB. A casca atual precisa ser preparada antes da perda de conexão e não depende de Service Worker.
 
+`GET /api/v1/jogos` mantém a visão operacional usada pela agenda e pelo preparo
+offline; perfis de mesário recebem a edição ativa e o filtro operacional é
+imposto pelo servidor, mesmo que o cliente envie `operacional=0`. A consulta de
+histórico da tela de chaveamento usa `GET /api/v1/jogos?visao=chaveamento`:
+administrador e colaborador podem filtrar pela edição; mesário recebe somente a
+edição ativa. A visão histórica é de leitura, rejeita alunos e não altera as
+permissões das rotas de escrita.
+
 ## Regras para mudanças
 
 1. Uma alteração de caso de uso deve incluir testes unitários do serviço e um
@@ -119,6 +127,40 @@ somente algarismos e valores acima do `INT` assinado são inválidos. O status d
 modalidade aceita somente `1`/`"1"` (ativa) e `0`/`"0"` (inativa), conforme o
 ENUM existente no banco. Atualizações parciais aplicam as mesmas regras aos
 campos informados.
+
+## Cronograma planejado e inscrições
+
+A migration `001_cronograma_inscricoes.sql` mantém o estado do cronograma, as
+quantidades de equipes por modalidade, a ordem das equipes preparadas e o
+snapshot versionado de compromissos em tabelas auxiliares. A migration
+`002_cronograma_nos.sql` acrescenta a árvore determinística de nós, BYEs,
+dependências e o mapeamento de cada entrada para os nós alcançáveis. Execute
+`php bin/sgi.php migrate` antes de usar o fluxo planejado.
+
+As edições começam com inscrições fechadas e cronograma planejado. O administrador informa `equipes_planejadas`,
+limites do elenco e formato; a preparação cria entradas vazias por turma de
+forma idempotente. A rota `/api/v1/cronograma` permite consultar o estado,
+gerar uma prévia determinística, publicar uma revisão, revisar uma publicação,
+materializar um nó quando houver elenco e abrir ou encerrar as inscrições. A
+publicação exige cobertura das modalidades e equipes, intervalos válidos e
+ausência de conflitos no mesmo recurso ou percurso da equipe. A árvore publicada
+é a única origem dos jogos planejados e preserva a identidade dos nós.
+
+Durante a inscrição, o servidor compara compromissos confirmados e
+condicionais de todas as modalidades escolhidas. Sobreposição recusa o lote na
+transação; categorias diferentes não formam disputas, mas continuam
+compartilhando locais e seus conflitos físicos.
+
+Uma revisão fecha as inscrições, avança a versão e mantém o snapshot anterior
+para auditoria. Ao gerar a nova proposta, a publicação suspensa deixa de ocupar
+seus próprios horários; reservas independentes e jogos já materializados
+continuam bloqueando conflitos. O mesmo painel permite revisar e republicar
+mais de uma vez antes da liberação. Depois dela, o servidor recusa nova revisão
+e não permite reabrir inscrições. O estado informa ao preparo do mesário que
+uma nova preparação é necessária; a fila IndexedDB existente não é limpa nem
+reescrita. A abertura fria offline continua fora do contrato: resultados já
+enfileirados permanecem intactos e a revisão só pode ser reconhecida após
+reconexão.
 
 ## Assets e ciclo de vida offline
 

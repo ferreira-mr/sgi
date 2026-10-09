@@ -7,26 +7,108 @@ async function jsonOrThrow(response, label) {
     return response.json();
 }
 
+function dataHoraUtc(offsetMinutes) {
+    const value = new Date(Date.now() + offsetMinutes * 60_000);
+    return value.toISOString().slice(0, 16);
+}
+
+async function prepararEdicaoPublicada(request) {
+    const edicoes = await jsonOrThrow(await request.get('api/v1/edicoes?regulamento=true'), 'consulta edições');
+    const anterior = (Array.isArray(edicoes) ? edicoes : []).find((item) => String(item.status_interclasse) === '1');
+    const criada = await jsonOrThrow(await request.post('api/v1/edicoes', {
+        data: {
+            nome_interclasse: `Portal cronograma ${Date.now()}`,
+            ano_interclasse: '2030-01-01 00:00:00',
+        },
+    }), 'criação da edição do portal');
+    const idInterclasse = Number(criada.id_interclasse || criada.id);
+    if (!idInterclasse) throw new Error(`A API não retornou a edição do portal: ${JSON.stringify(criada)}`);
+
+    const [categorias, turmas, modalidades, locais] = await Promise.all([
+        jsonOrThrow(await request.get(`api/v1/categorias?id_interclasse=${idInterclasse}`), 'categorias do portal'),
+        jsonOrThrow(await request.get(`api/v1/turmas?id_interclasse=${idInterclasse}`), 'turmas do portal'),
+        jsonOrThrow(await request.get(`api/v1/modalidades?id_interclasse=${idInterclasse}`), 'modalidades do portal'),
+        jsonOrThrow(await request.get(`api/v1/locais?id_interclasse=${idInterclasse}&disponivel=1`), 'locais do portal'),
+    ]);
+    const categoria = Array.isArray(categorias) ? categorias[0] : null;
+    const turma = Array.isArray(turmas)
+        ? turmas.find((item) => Number(item.categorias_id_categoria) === Number(categoria?.id_categoria)) || turmas[0]
+        : null;
+    const ativas = (Array.isArray(modalidades) ? modalidades : []).filter((item) => Number(item.categorias_id_categoria) === Number(categoria?.id_categoria));
+    const masculina = ativas.find((item) => String(item.genero_modalidade).toUpperCase() === 'MASC');
+    const feminina = ativas.find((item) => String(item.genero_modalidade).toUpperCase() === 'FEM');
+    if (!categoria || !turma || !masculina || !feminina) throw new Error('A edição do portal não possui modalidades MASC/FEM na primeira categoria.');
+    const escolhidas = new Set([Number(masculina.id_modalidade), Number(feminina.id_modalidade)]);
+    for (const modalidade of (Array.isArray(modalidades) ? modalidades : [])) {
+        const id = Number(modalidade.id_modalidade);
+        const manter = escolhidas.has(id);
+        const response = await request.put('api/v1/modalidades', {
+            data: manter
+                ? {
+                    id_modalidade: id,
+                    interclasses_id_interclasse: idInterclasse,
+                    status_modalidade: '1',
+                    equipes_planejadas: 2,
+                    min_inscritos_equipe: 1,
+                    max_inscritos_equipe: 10,
+                    formato_participacao: 'equipe',
+                    duracao_prevista_min: 5,
+                    descanso_min: 0,
+                }
+                : { id_modalidade: id, status_modalidade: '0' },
+        });
+        await jsonOrThrow(response, `configuração da modalidade ${id}`);
+    }
+    await jsonOrThrow(await request.post('api/v1/cronograma', {
+        data: { acao: 'preparar_equipes', id_interclasse: idInterclasse },
+    }), 'preparação das equipes do portal');
+    const inicio = '2030-01-01';
+    const draft = await jsonOrThrow(await request.post('api/v1/cronograma', {
+        data: {
+            acao: 'gerar_rascunho',
+            id_interclasse: idInterclasse,
+            data_inicio: inicio,
+            data_fim: inicio,
+            hora_inicio: '00:00',
+            hora_fim: '23:59',
+            duracao_min: 5,
+            intervalo_min: 0,
+            id_locais: [Number((Array.isArray(locais) ? locais[0] : null)?.id_local)],
+        },
+    }), 'geração do cronograma do portal');
+    const estado = await jsonOrThrow(await request.get(`api/v1/cronograma?id_interclasse=${idInterclasse}`), 'estado do cronograma do portal');
+    await jsonOrThrow(await request.post('api/v1/cronograma', {
+        data: {
+            acao: 'publicar',
+            id_interclasse: idInterclasse,
+            cronograma_versao: Number(estado.cronograma_versao || 0),
+            nos: draft.nos,
+            compromissos: draft.compromissos,
+        },
+    }), 'publicação do cronograma do portal');
+    const publicado = await jsonOrThrow(await request.get(`api/v1/cronograma?id_interclasse=${idInterclasse}`), 'revisão publicada do portal');
+    await jsonOrThrow(await request.post('api/v1/cronograma', {
+        data: {
+            acao: 'abrir_inscricoes',
+            id_interclasse: idInterclasse,
+            cronograma_versao: Number(publicado.cronograma_versao || 0),
+            inscricoes_abertura: dataHoraUtc(-5),
+            inscricoes_encerramento: dataHoraUtc(24 * 60),
+        },
+    }), 'abertura das inscrições do portal');
+    await jsonOrThrow(await request.post(`api/v1/edicoes?id=${idInterclasse}`, {
+        data: { status_interclasse: '1' },
+    }), 'ativação da edição do portal');
+    return { idInterclasse, idTurma: Number(turma.id_turma), anterior: Number(anterior?.id_interclasse || 0) };
+}
+
 async function prepararAlunoFixture(request) {
     await jsonOrThrow(await request.post('api/v1/login', {
         data: { matricula: 'admin', senha: '123' }
     }), 'login administrativo de preparação');
-
-    const edicoes = await jsonOrThrow(
-        await request.get('api/v1/edicoes?regulamento=true'),
-        'consulta edições'
-    );
-    const edicao = (Array.isArray(edicoes) ? edicoes : []).find((e) => String(e.status_interclasse) === '1') || edicoes[0];
-    if (!edicao) throw new Error('Nenhuma edição disponível.');
-    const idInterclasse = Number(edicao.id_interclasse);
-
-    const turmas = await jsonOrThrow(
-        await request.get(`api/v1/turmas?id_interclasse=${idInterclasse}`),
-        'consulta turmas'
-    );
-    const turma = (Array.isArray(turmas) && turmas.length > 0) ? turmas[0] : null;
-    if (!turma) throw new Error('Nenhuma turma encontrada.');
-    const idTurma = Number(turma.id_turma);
+    const cronograma = await prepararEdicaoPublicada(request);
+    const idInterclasse = cronograma.idInterclasse;
+    const idTurma = cronograma.idTurma;
 
     const matricula = `55${Date.now().toString().slice(-7)}`;
     const novoAluno = await jsonOrThrow(await request.post('api/v1/usuarios?acao=criar_aluno', {
@@ -46,6 +128,7 @@ async function prepararAlunoFixture(request) {
     return {
         idInterclasse,
         idTurma,
+        idInterclasseAnterior: cronograma.anterior,
         matricula,
         senhaOriginal: String(novoAluno.senha_temporaria || '')
     };
@@ -56,6 +139,15 @@ test.describe.serial('Portal do Aluno — Jornada Interativa e Regras de Negóci
 
     test.beforeAll(async ({ request }) => {
         fixture = await prepararAlunoFixture(request);
+    });
+
+    test.afterAll(async ({ request }) => {
+        if (!fixture) return;
+        await request.post('api/v1/login', { data: { matricula: 'admin', senha: '123' } });
+        if (fixture.idInterclasseAnterior) {
+            await request.post(`api/v1/edicoes?id=${fixture.idInterclasseAnterior}`, { data: { status_interclasse: '1' } });
+        }
+        await request.post(`api/v1/edicoes?id=${fixture.idInterclasse}`, { data: { status_interclasse: '0' } });
     });
 
     test('login do aluno e leitura dos termos de responsabilidade', async ({ page }) => {
@@ -202,13 +294,17 @@ test.describe.serial('Portal do Aluno — Jornada Interativa e Regras de Negóci
 
         const linhaEquipe = modalEquipes.locator('.equipe-pick-row').first();
         await expect(linhaEquipe).toBeVisible({ timeout: 10_000 });
+        await expect(linhaEquipe).toContainText('01/01/2030');
         await linhaEquipe.click();
         await expect(modalEquipes).toBeHidden({ timeout: 10_000 });
 
         // Confirmar que o card recebeu a classe de selecionado
         await expect(page.locator('.modalidade-card.selected')).toHaveCount(1);
+        await expect(page.locator('#agendaInscricaoPreview')).toBeVisible({ timeout: 10_000 });
+        await expect(page.locator('#agendaInscricaoPreview')).toContainText('01/01/2030');
 
         const inelegivel = await page.evaluate(async ({ idInterclasse, idTurma }) => {
+            const config = JSON.parse(document.querySelector('[data-sgi-config="aluno/modalidade"]')?.textContent || '{}');
             const turmasResponse = await fetch(`/api/v1/turmas?id_interclasse=${idInterclasse}`);
             const turmas = await turmasResponse.json();
             const turma = Array.isArray(turmas)
@@ -236,12 +332,17 @@ test.describe.serial('Portal do Aluno — Jornada Interativa e Regras de Negóci
             const response = await fetch('/api/v1/inscricoes', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id_interclasse: idInterclasse, id_equipes: [Number(equipe.id_equipe)] }),
+                body: JSON.stringify({
+                    id_interclasse: idInterclasse,
+                    id_equipes: [Number(equipe.id_equipe)],
+                    cronograma_versao: config.value7 == null ? undefined : Number(config.value7),
+                    versao_publicada: config.value8 == null ? undefined : Number(config.value8),
+                }),
             });
             return { status: response.status, body: await response.json() };
         }, { idInterclasse: fixture.idInterclasse, idTurma: fixture.idTurma });
         expect(inelegivel.setupError).toBeUndefined();
-        expect(inelegivel.status).toBe(400);
+        expect(inelegivel.status).toBe(409);
         expect(inelegivel.body.success).toBe(false);
         expect(inelegivel.body.message).toMatch(/gênero/i);
 
@@ -283,7 +384,9 @@ test.describe.serial('Portal do Aluno — Jornada Interativa e Regras de Negóci
         await page.waitForURL(/\/aluno\/inicio/, { timeout: 15_000 });
 
         await expect(page.locator('nav a[aria-label="Rankings publicados"], nav a[title="Rankings publicados"]')).toHaveCount(0);
-        await expect(page.locator('.aluno-card[data-status="active"] a.btn').first()).toContainText('Ver Detalhes');
+        const edicaoAtiva = page.locator('.aluno-card[data-status="active"]');
+        await expect(edicaoAtiva.locator('a.btn').first()).toHaveAttribute('href', new RegExp(`[?&]id=${fixture.idInterclasse}(?:&|$)`));
+        await expect(edicaoAtiva.locator('a.btn').first()).toContainText('Inscrever-se em modalidades');
 
         // 1. Tela de Jogos
         await page.goto(`aluno/jogos?id=${fixture.idInterclasse}`, { waitUntil: 'domcontentloaded' });

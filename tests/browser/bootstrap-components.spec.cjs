@@ -3,17 +3,16 @@ const fs = require('node:fs');
 const path = require('node:path');
 const root = path.resolve(__dirname, '../..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
+const assetUrl = (file) => new URL(`assets/${file}`, process.env.SGI_BASE_URL || 'http://localhost/SGI/').toString();
 
 for (const width of [390, 1440]) {
     test('native button and switch states survive context CSS at ' + width, async ({ page }) => {
         await page.setViewportSize({ width, height: 900 });
         await page.emulateMedia({ reducedMotion: 'reduce' });
         await page.route('https://fonts.googleapis.com/**', route => route.fulfill({ contentType: 'text/css', body: '' }));
-        const template = read('resources/views/pages/competicoes/chaveamento.php');
-        const button = template.match(/<button[^>]*id="btnGerarChaveamento"[^>]*>/)[0];
-        await page.setContent(button + 'Gerar</button><input type="checkbox" class="form-check-input status-switch" aria-label="Edição ativa">');
-        await page.addStyleTag({ content: read('public/assets/css/bootstrap-theme.css') });
-        const action = page.locator('#btnGerarChaveamento');
+        await page.setContent('<button type="button" class="btn btn-primary" id="theme-button">Ação</button><input type="checkbox" class="form-check-input status-switch" aria-label="Edição ativa">');
+        await page.addStyleTag({ url: assetUrl('css/bootstrap-theme.css') });
+        const action = page.locator('#theme-button');
         const toggle = page.getByRole('checkbox');
         const style = locator => locator.evaluate(el => {
             const s = getComputedStyle(el);
@@ -24,7 +23,7 @@ for (const width of [390, 1440]) {
         await action.hover(); reference.hover = await style(action);
         await action.evaluate(el => el.disabled = true); reference.disabled = await style(action);
         await toggle.check(); await toggle.focus(); reference.checked = await style(toggle);
-        for (const file of ['shared', 'admin']) await page.addStyleTag({ content: read('public/assets/css/' + file + '.css') });
+        for (const file of ['shared', 'admin']) await page.addStyleTag({ url: assetUrl(`css/${file}.css`) });
         await expect.poll(() => style(toggle)).toEqual(reference.checked);
         await expect.poll(() => style(action)).toEqual(reference.disabled);
         await action.evaluate(el => el.disabled = false);
@@ -40,9 +39,9 @@ for (const width of [390, 1440]) {
 test('feedback uses the Bootstrap Toast API and escapes message text', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 900 });
     await page.setContent('<div class="toast-container position-fixed top-0 end-0 p-3" id="sgiToastContainer"></div>');
-    await page.addStyleTag({ path: path.join(root, 'public/assets/css/bootstrap-theme.css') });
-    await page.addScriptTag({ path: path.join(root, 'public/assets/vendor/bootstrap/js/bootstrap.bundle.min.js') });
-    await page.addScriptTag({ path: path.join(root, 'resources/js/shared/bootstrap-feedback.js') });
+    await page.addStyleTag({ url: assetUrl('css/bootstrap-theme.css') });
+    await page.addScriptTag({ url: assetUrl('vendor/bootstrap/js/bootstrap.bundle.min.js') });
+    await page.addScriptTag({ url: assetUrl('js/shared/bootstrap-feedback.js') });
 
     await page.evaluate(() => window.SGI.showToast('<b>mensagem</b>', 'error', { delay: 50 }));
     const toast = page.locator('#sgiToastContainer .toast');
@@ -56,10 +55,10 @@ test('feedback uses the Bootstrap Toast API and escapes message text', async ({ 
 test('feedback dialogs are modal, accessible, queued and safe', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 900 });
     await page.setContent('<button id="origin">Abrir</button>');
-    await page.addStyleTag({ path: path.join(root, 'public/assets/css/bootstrap-theme.css') });
-    await page.addStyleTag({ path: path.join(root, 'public/assets/css/shared.css') });
-    await page.addScriptTag({ path: path.join(root, 'public/assets/vendor/bootstrap/js/bootstrap.bundle.min.js') });
-    await page.addScriptTag({ path: path.join(root, 'resources/js/shared/bootstrap-feedback.js') });
+    await page.addStyleTag({ url: assetUrl('css/bootstrap-theme.css') });
+    await page.addStyleTag({ url: assetUrl('css/shared.css') });
+    await page.addScriptTag({ url: assetUrl('vendor/bootstrap/js/bootstrap.bundle.min.js') });
+    await page.addScriptTag({ url: assetUrl('js/shared/bootstrap-feedback.js') });
 
     await page.evaluate(() => {
         window.__sgiFirstDialog = window.SGI.alert({

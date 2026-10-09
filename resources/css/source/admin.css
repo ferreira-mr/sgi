@@ -23,18 +23,7 @@
    PERFIL (perfil.php)
    ========================================================================== */
 
-/* Bootstrap supplies the avatar treatment; only the domain-specific size remains. */
-.perfil-avatar-ring {
-    width: 150px;
-    height: 150px;
-}
-
-@media (max-width: 767.98px) {
-    .perfil-avatar-ring {
-        width: 130px;
-        height: 130px;
-    }
-}
+/* .perfil-avatar-ring consolidated in resources/scss/shared.scss */
 
 /* ==========================================================================
    SGI OFFLINE — Banner de status (modo offline / sincronização)
@@ -108,8 +97,9 @@
 
 @media (min-width: 768px) {
     /* Dashboard */
+    .sgi-page--dashboard [class~="main-dashboard-layout"],
     body:has(#conteudo-principal) [class~="main-dashboard-layout"] {
-        background: #fafafa;
+        background: var(--bs-body-bg);
         padding: 3.125rem clamp(3.125rem, 4vw, 5rem) !important;
     }
 
@@ -207,37 +197,37 @@
        .sgi-back-button em scss/shared.scss; mantém-se apenas o ajuste dos
        botões de ação (restaurar/salvar) e dos campos de ano/status. */
 
-    body:has(#btnVoltarPontuacao) #btnRestaurarPadrao,
-    body:has(#btnVoltarPontuacao) #btnSalvarPontuacao {
+    :is(.sgi-page--pontuacao, body:has(#btnVoltarPontuacao)) #btnRestaurarPadrao,
+    :is(.sgi-page--pontuacao, body:has(#btnVoltarPontuacao)) #btnSalvarPontuacao {
         min-height: 3.375rem;
         padding-inline: 1.25rem;
         border-radius: .875rem;
         font-weight: 700;
     }
 
-    body:has(#btnVoltarPontuacao) #btnSalvarPontuacao {
+    :is(.sgi-page--pontuacao, body:has(#btnVoltarPontuacao)) #btnSalvarPontuacao {
         min-width: 8.5rem;
         box-shadow: 0 .5rem 1rem rgba(227, 6, 19, .16);
     }
 
-    body:has(#btnVoltarPontuacao) #ptcEditionYear,
-    body:has(#btnVoltarPontuacao) #ptcEditionStatus {
+    :is(.sgi-page--pontuacao, body:has(#btnVoltarPontuacao)) #ptcEditionYear,
+    :is(.sgi-page--pontuacao, body:has(#btnVoltarPontuacao)) #ptcEditionStatus {
         display: none;
     }
 
-    body:has(#btnVoltarPontuacao) .main-desktop-layout > .container-fluid > .row {
+    :is(.sgi-page--pontuacao, body:has(#btnVoltarPontuacao)) .main-desktop-layout > .container-fluid > .row {
         --bs-gutter-x: 1.875rem;
         --bs-gutter-y: 1.5rem;
     }
 
-    body:has(#btnVoltarPontuacao) .main-desktop-layout > .container-fluid > .row .card {
+    :is(.sgi-page--pontuacao, body:has(#btnVoltarPontuacao)) .main-desktop-layout > .container-fluid > .row .card {
         min-height: 16.75rem;
         padding: 1rem 1.25rem !important;
         border-radius: 1.25rem;
         box-shadow: 0 .25rem .5rem rgba(15, 23, 42, .08) !important;
     }
 
-    body:has(#btnVoltarPontuacao) .main-desktop-layout > .container-fluid > .row .card .rounded-3 {
+    :is(.sgi-page--pontuacao, body:has(#btnVoltarPontuacao)) .main-desktop-layout > .container-fluid > .row .card .rounded-3 {
         width: 3rem;
         height: 3rem;
         align-items: center;
@@ -245,37 +235,37 @@
         border-radius: 1rem !important;
     }
 
-    body:has(#btnVoltarPontuacao) .main-desktop-layout > .container-fluid > .row .card .badge {
+    :is(.sgi-page--pontuacao, body:has(#btnVoltarPontuacao)) .main-desktop-layout > .container-fluid > .row .card .badge {
         padding: .5rem .75rem;
         border-radius: 999px;
         letter-spacing: .06em;
         font-size: .7rem;
     }
 
-    body:has(#btnVoltarPontuacao) .ptc-step-btn {
+    :is(.sgi-page--pontuacao, body:has(#btnVoltarPontuacao)) .ptc-step-btn {
         width: 3.125rem;
         height: 3.125rem;
         border: 0;
         border-radius: 1rem !important;
     }
 
-    body:has(#btnVoltarPontuacao) .ptc-step-input {
+    :is(.sgi-page--pontuacao, body:has(#btnVoltarPontuacao)) .ptc-step-input {
         width: 6.25rem;
         height: 3.5rem;
         border-radius: .875rem;
         font-size: 1.35rem;
     }
 
-    body:has(#btnVoltarPontuacao) [class*="col-"]:has(#pontos-1) .card { background: #fff9e7; border-color: #f59e0b !important; }
-    body:has(#btnVoltarPontuacao) [class*="col-"]:has(#pontos-2) .card { background: #f3f6fa; border-color: #64748b !important; }
-    body:has(#btnVoltarPontuacao) [class*="col-"]:has(#pontos-3) .card { background: #fff5ea; border-color: #d97706 !important; }
-    body:has(#btnVoltarPontuacao) [class*="col-"]:has(#pontos-arr) .card { background: #fff1f2; border-color: #fb4a55 !important; }
-    body:has(#btnVoltarPontuacao) [class*="col-"]:has(#pontos-1) .ptc-step-btn { background: #fff1bf; color: #b45309; }
-    body:has(#btnVoltarPontuacao) [class*="col-"]:has(#pontos-2) .ptc-step-btn { background: #eef2f7; color: #475569; }
-    body:has(#btnVoltarPontuacao) [class*="col-"]:has(#pontos-3) .ptc-step-btn { background: #ffead8; color: #c26109; }
-    body:has(#btnVoltarPontuacao) [class*="col-"]:has(#pontos-arr) .ptc-step-btn { background: #ffe8eb; color: #e11d48; }
+    :is(.sgi-page--pontuacao, body:has(#btnVoltarPontuacao)) [class*="col-"]:has(#pontos-1) .card { background: #fff9e7; border-color: #f59e0b !important; }
+    :is(.sgi-page--pontuacao, body:has(#btnVoltarPontuacao)) [class*="col-"]:has(#pontos-2) .card { background: #f3f6fa; border-color: #64748b !important; }
+    :is(.sgi-page--pontuacao, body:has(#btnVoltarPontuacao)) [class*="col-"]:has(#pontos-3) .card { background: #fff5ea; border-color: #d97706 !important; }
+    :is(.sgi-page--pontuacao, body:has(#btnVoltarPontuacao)) [class*="col-"]:has(#pontos-arr) .card { background: #fff1f2; border-color: #fb4a55 !important; }
+    :is(.sgi-page--pontuacao, body:has(#btnVoltarPontuacao)) [class*="col-"]:has(#pontos-1) .ptc-step-btn { background: #fff1bf; color: #78350f; }
+    :is(.sgi-page--pontuacao, body:has(#btnVoltarPontuacao)) [class*="col-"]:has(#pontos-2) .ptc-step-btn { background: #eef2f7; color: #475569; }
+    :is(.sgi-page--pontuacao, body:has(#btnVoltarPontuacao)) [class*="col-"]:has(#pontos-3) .ptc-step-btn { background: #ffead8; color: #7c2d12; }
+    :is(.sgi-page--pontuacao, body:has(#btnVoltarPontuacao)) [class*="col-"]:has(#pontos-arr) .ptc-step-btn { background: #ffe8eb; color: #9f1239; }
 
-    body:has(#btnVoltarPontuacao) .main-desktop-layout > .container-fluid > .alert {
+    :is(.sgi-page--pontuacao, body:has(#btnVoltarPontuacao)) .main-desktop-layout > .container-fluid > .alert {
         min-height: 4.25rem;
         border: 1px solid #e2e8f0;
         border-radius: 1rem;
@@ -284,32 +274,32 @@
     }
 
     /* Arrecadação e ocorrências */
-    body:has(#listaArrecadacaoDesktop) .main-desktop-layout,
+    :is(.sgi-page--arrecadacao, body:has(#listaArrecadacaoDesktop)) .main-desktop-layout,
     .sgi-ocorrencias-desktop {
         min-height: 100%;
         padding: 3.125rem clamp(3.125rem, 4vw, 5rem) 3rem !important;
-        background: #fafafa;
+        background: var(--bs-body-bg);
     }
 
-    body:has(#listaArrecadacaoDesktop) .main-desktop-layout > .container-fluid,
+    :is(.sgi-page--arrecadacao, body:has(#listaArrecadacaoDesktop)) .main-desktop-layout > .container-fluid,
     .sgi-ocorrencias-desktop > .container-fluid {
         padding: 0 !important;
     }
 
-    body:has(#listaArrecadacaoDesktop) .main-desktop-layout > .container-fluid > .mb-4:first-child,
+    :is(.sgi-page--arrecadacao, body:has(#listaArrecadacaoDesktop)) .main-desktop-layout > .container-fluid > .mb-4:first-child,
     .sgi-ocorrencias-desktop > .container-fluid > .mb-4:first-child {
         margin-bottom: 3.75rem !important;
     }
 
-    body:has(#listaArrecadacaoDesktop) .main-desktop-layout h1,
+    :is(.sgi-page--arrecadacao, body:has(#listaArrecadacaoDesktop)) .main-desktop-layout h1,
     .sgi-ocorrencias-desktop h1 {
         font-size: 2rem;
         font-weight: 500 !important;
     }
 
-    body:has(#listaArrecadacaoDesktop) .main-desktop-layout h1 + p,
+    :is(.sgi-page--arrecadacao, body:has(#listaArrecadacaoDesktop)) .main-desktop-layout h1 + p,
     .sgi-ocorrencias-desktop h1 + p {
-        color: #64748b !important;
+        color: #475569 !important;
         font-size: 1rem;
     }
 
@@ -344,7 +334,7 @@
     :is(#listaArrecadacaoDesktop, #listaOcorrenciasDesktop) > .col > .card .badge {
         padding: .4rem .625rem;
         background: #f3f4f6 !important;
-        color: #64748b !important;
+        color: #334155 !important;
         font-size: .75rem;
         font-weight: 600;
     }
@@ -362,7 +352,7 @@
         border-color: #e2e8f0;
         border-radius: 0 .875rem .875rem 0;
         background: #fff;
-        color: #94a3b8;
+        color: #475569;
         font-size: .75rem;
         font-weight: 700;
         text-transform: uppercase;
@@ -388,8 +378,8 @@
 
 /* Página de equipes: composição de painel para modalidades e suas turmas. */
 @media (min-width: 768px) {
-    body:has(#listaEquipesDesktop) .main-desktop-layout {
-        background: #fbfcfd;
+    :is(.sgi-page--equipes, body:has(#listaEquipesDesktop)) .main-desktop-layout {
+        background: var(--bs-body-bg);
     }
 
     body:has(#listaEquipesDesktop) .main-desktop-layout > .container-fluid {
@@ -531,7 +521,7 @@
     }
 
     body:has(#listaEquipesDesktop) .aluno-card :is(.btn, a):focus-visible {
-        outline: .1875rem solid #0d6efd;
+        outline: .1875rem solid var(--bs-primary);
         outline-offset: .1875rem;
     }
 }
@@ -626,12 +616,12 @@
 }
 
 /* ── Responsive ── */
-@media (max-width: 991px) {
+@media (max-width: 991.98px) {
     .bracket-tree { padding-bottom: 20px; }
     .bracket-round-col { min-width: 220px; padding: 0 12px; }
 }
 
-@media (max-width: 575px) {
+@media (max-width: 575.98px) {
     .bracket-tree { flex-direction: column; align-items: stretch; overflow-x: hidden; }
     .bracket-round-col { min-width: 100%; max-width: 100%; flex: none; padding: 0; margin-bottom: 8px; }
     .bracket-round-col .bkt-match { margin-bottom: 12px; }
@@ -662,7 +652,7 @@
 .kvs--aberto .kvs__panel { opacity: 1; visibility: visible; }
 .kvs__trigger:focus-visible,
 .kvs__search:focus-visible,
-.kvs__opcao:focus-visible { outline: 3px solid #0d6efd; outline-offset: 2px; }
+.kvs__opcao:focus-visible { outline: 3px solid var(--bs-primary); outline-offset: 2px; }
 .kvs__grupo-titulo { letter-spacing: .05em; }
 .kvs__opcao {
     min-height: 44px;
@@ -670,7 +660,7 @@
 .kvs__opcao:hover { background: var(--bs-danger-bg-subtle); }
 .kvs__opcao--ativa { background: var(--bs-danger-bg-subtle); color: var(--bs-danger-text-emphasis); font-weight: 700; }
 .kvs__opcao[aria-selected="true"] { background: var(--bs-danger-bg-subtle); color: var(--bs-danger-text-emphasis); font-weight: 700; }
-.kvs__opcao--focada { box-shadow: inset 0 0 0 2px #0d6efd; }
+.kvs__opcao--focada { box-shadow: inset 0 0 0 2px var(--bs-primary); }
 .kvs__opcao-nome { min-width: 0; }
 .kvs__opcao-tipo {
     flex-shrink: 0;
@@ -693,23 +683,8 @@
 /* ==========================================================================
    NAVEGAÇÃO — AVATAR E NAVEGAÇÃO MÓVEL (componentes/nav.php)
    ========================================================================== */
+/* Scrollbar de .sidebar-nav consolidado em resources/scss/shared.scss */
 
-.sidebar-nav {
-    overflow-y: auto;
-    scrollbar-width: none;
-}
-.sidebar-nav::-webkit-scrollbar {
-    display: none;
-}
-.sidebar-nav .sidebar-nav-list li {
-    flex-shrink: 0;
-}
-@media (max-height: 700px) {
-    .sidebar-nav .sidebar-nav-list {
-        gap: 0.5rem !important;
-        font-size: 1.25rem !important;
-    }
-}
 /* ==========================================================================
    AGENDA — EDITOR DE AGENDA (edicao_agenda.php)
    ========================================================================== */
@@ -717,7 +692,7 @@
 /* ── Calendário: apenas a grade específica do domínio permanece própria. ── */
 .ag-cal-day { height: 38px; font-size: .85rem; font-weight: 500; color: #374151; cursor: pointer; border-radius: 10px; position: relative; }
 .ag-cal-day:not(.ag-cal-day--empty) { border: 0; padding: 0; background: transparent; font: inherit; color: inherit; cursor: pointer; }
-.ag-cal-day:not(.ag-cal-day--empty):focus-visible { outline: 3px solid #0d6efd; outline-offset: 2px; z-index: 2; }
+.ag-cal-day:not(.ag-cal-day--empty):focus-visible { outline: 3px solid var(--bs-primary); outline-offset: 2px; z-index: 2; }
 .ag-cal-day:hover { background: var(--bs-tertiary-bg); }
 .ag-cal-day--empty { cursor: default; }
 .ag-cal-day--empty:hover { background: transparent; }
@@ -746,12 +721,180 @@
     .ag-mobile { padding-top: 5.5rem; padding-bottom: 5rem; }
 }
 
+/* ── Stepper e cartões de etapa do cronograma planejado. ── */
+.sgi-stepper {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: .625rem;
+}
+
+.sgi-stepper__item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .625rem .875rem;
+    border-radius: .75rem;
+    border: 1px solid var(--bs-border-color);
+    background: var(--bs-body-bg);
+    min-width: 0;
+}
+
+.sgi-stepper__circle {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .8125rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    border: 2px solid var(--bs-border-color);
+    background: var(--bs-body-bg);
+    color: #475569;
+}
+
+.sgi-stepper__check {
+    display: none;
+}
+
+.sgi-stepper__body {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.25;
+}
+
+.sgi-stepper__label {
+    font-size: .8125rem;
+    font-weight: 600;
+    color: #334155;
+}
+
+.sgi-stepper__meta {
+    font-size: .72rem;
+    color: #475569;
+}
+
+.sgi-stepper__item--completed {
+    border-color: var(--bs-success-border-subtle);
+    background: var(--bs-success-bg-subtle);
+}
+
+.sgi-stepper__item--completed .sgi-stepper__circle {
+    background: var(--bs-success);
+    border-color: var(--bs-success);
+    color: #fff;
+}
+
+.sgi-stepper__item--completed .sgi-stepper__num {
+    display: none;
+}
+
+.sgi-stepper__item--completed .sgi-stepper__check {
+    display: inline-block;
+}
+
+.sgi-stepper__item--completed .sgi-stepper__label {
+    color: var(--bs-success-text-emphasis);
+}
+
+.sgi-stepper__item--completed .sgi-stepper__meta {
+    color: var(--bs-success-text-emphasis);
+    font-weight: 600;
+}
+
+.sgi-stepper__item--active {
+    border-color: var(--bs-primary);
+    border-width: 2px;
+    background: var(--bs-primary-bg-subtle);
+    box-shadow: 0 .25rem .75rem rgba(var(--bs-primary-rgb), .12);
+}
+
+.sgi-stepper__item--active .sgi-stepper__circle {
+    background: var(--bs-primary);
+    border-color: var(--bs-primary);
+    color: #fff;
+    box-shadow: 0 0 0 4px rgba(var(--bs-primary-rgb), .2);
+}
+
+.sgi-stepper__item--active .sgi-stepper__label {
+    color: var(--bs-body-color);
+    font-weight: 700;
+}
+
+.sgi-stepper__item--active .sgi-stepper__meta {
+    color: var(--bs-primary);
+    font-weight: 700;
+}
+
+.sgi-stepper__item--upcoming {
+    background: var(--bs-tertiary-bg);
+}
+
+.sgi-stepper__item--upcoming .sgi-stepper__label,
+.sgi-stepper__item--upcoming .sgi-stepper__meta {
+    color: #475569;
+}
+
+.sgi-step-card {
+    border: 1px solid var(--bs-border-color);
+    background: var(--bs-body-bg);
+}
+
+.sgi-step-card--completed {
+    border-color: var(--bs-success-border-subtle);
+    background: var(--bs-body-bg);
+}
+
+.sgi-step-card--active {
+    border-color: var(--bs-primary) !important;
+    border-width: 2px !important;
+    background: var(--bs-body-bg);
+    box-shadow: 0 .35rem 1rem rgba(var(--bs-primary-rgb), .14) !important;
+}
+
+.sgi-step-card--upcoming {
+    border-color: var(--bs-border-color);
+    background: var(--bs-tertiary-bg);
+}
+
+@media (min-width: 768px) {
+    .sgi-stepper {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1200px) {
+    .sgi-stepper {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: .75rem;
+    }
+
+    .sgi-stepper__item:not(:last-child)::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        right: -.75rem;
+        width: .75rem;
+        height: 2px;
+        background: var(--bs-border-color);
+        transform: translateY(-50%);
+        z-index: 1;
+    }
+
+    .sgi-stepper__item--completed:not(:last-child)::after {
+        background: var(--bs-success);
+    }
+}
+
 /* ==========================================================================
    RANKING DETALHADO — HISTÓRICO DE TURMA (ranking.php)
    ========================================================================== */
 
 @media (min-width: 768px) {
-    body:has(.sgi-ranking-page) .main-desktop-layout > .container-fluid {
+    :is(.sgi-page--ranking, body:has(.sgi-ranking-page)) .main-desktop-layout > .container-fluid {
         padding: 3.125rem clamp(3.125rem, 4vw, 5rem) 3rem !important;
     }
 }
@@ -787,7 +930,7 @@
 .mc-fab{width:62px;height:62px}
 
 /* --- Responsive --- */
-@media(max-width:767px){
+@media (max-width: 767.98px) {
     .mc-timer-time{font-size:2.5rem}
     .mc-score{font-size:4.5rem;min-width:auto}
     .btn-score{width:48px;height:48px;font-size:1.3rem}
@@ -795,7 +938,7 @@
     .tl-event-actions{opacity:1}
 }
 
-@media(max-width:400px){
+@media (max-width: 399.98px) {
     .mc-score{font-size:3.5rem}
     .mc-timer-time{font-size:2rem}
     .btn-score{width:44px;height:44px;font-size:1.15rem}

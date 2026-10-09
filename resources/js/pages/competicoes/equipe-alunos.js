@@ -18,7 +18,7 @@ function mostrarToast(tipo, texto) {
 
 function cardAluno(aluno) {
     const idAluno = String(aluno.id_usuario || '');
-    const nomeAluno = String(aluno.nome_usuario || 'Aluno');
+    const nomeAluno = String(aluno.nome_usuario || 'Estudante');
     const matriculaAluno = String(aluno.matricula_usuario || '');
     const estaNaEquipe = alunosNaEquipe.some(a => String(a.id_usuario) === idAluno);
     const selecionado = estaNaEquipe || alunosSelecionados.has(idAluno);
@@ -52,16 +52,16 @@ function renderizar(lista) {
 
     let msg = '';
         if (carregando && !rosterCarregado) {
-            msg = '<div class="col-12 text-center py-5 text-body-secondary" role="status"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Carregando alunos…</div>';
+            msg = '<div class="col-12 text-center py-5 text-body-secondary" role="status"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Carregando estudantes…</div>';
         } else if (erroCarregamento && !rosterCarregado) {
             msg = avisoCarregamento(erroCarregamento, true);
         } else {
             if (erroCarregamento) msg += avisoCarregamento(erroCarregamento, true);
-            if (carregando) msg += '<div class="col-12 small text-body-secondary" role="status">Atualizando a lista de alunos…</div>';
+            if (carregando) msg += '<div class="col-12 small text-body-secondary" role="status">Atualizando a lista de estudantes…</div>';
         if (!lista.length && alunos.length > 0) {
-            msg += '<div class="col-12"><div class="text-center py-5 text-body-secondary"><i class="bi bi-search fs-1 d-block mb-3" aria-hidden="true"></i><h5 class="fw-semibold mb-2">Nenhum aluno corresponde à busca.</h5><button type="button" class="btn btn-outline-primary btn-sm" data-sgi-action="clear-roster-search">Limpar busca</button></div></div>';
+            msg += '<div class="col-12"><div class="text-center py-5 text-body-secondary"><i class="bi bi-search fs-1 d-block mb-3" aria-hidden="true"></i><h5 class="fw-semibold mb-2">Nenhum estudante corresponde à busca.</h5><button type="button" class="btn btn-outline-primary btn-sm" data-sgi-action="clear-roster-search">Limpar busca</button></div></div>';
         } else if (!lista.length) {
-            msg += '<div class="col-12"><div class="text-center py-5 text-body-secondary"><i class="bi bi-people fs-1 d-block mb-3" aria-hidden="true"></i><h5 class="fw-semibold mb-2">Nenhum aluno disponível</h5><p class="small mb-0">Nenhum aluno foi encontrado para esta turma com o gênero compatível com a modalidade.</p></div></div>';
+            msg += '<div class="col-12"><div class="text-center py-5 text-body-secondary"><i class="bi bi-people fs-1 d-block mb-3" aria-hidden="true"></i><h5 class="fw-semibold mb-2">Nenhum estudante disponível</h5><p class="small mb-0">Nenhum estudante foi encontrado para esta turma com o gênero compatível com a modalidade.</p></div></div>';
         } else {
             msg += lista.map(cardAluno).join('');
         }
@@ -76,14 +76,14 @@ function atualizarAcoesSelecao() {
     const membros = new Set(alunosNaEquipe.map(aluno => String(aluno.id_usuario)));
     const novosSelecionados = [...alunosSelecionados]
         .filter(id => !membros.has(String(id))).length;
-    const nomeContagem = `Adicionar ${novosSelecionados} ${novosSelecionados === 1 ? 'aluno' : 'alunos'}`;
+    const nomeContagem = `Adicionar ${novosSelecionados} ${novosSelecionados === 1 ? 'estudante' : 'estudantes'}`;
     let feedback;
     if (salvando) {
-        feedback = 'Adicionando alunos à equipe.';
+        feedback = 'Adicionando estudantes à equipe.';
     } else if (novosSelecionados === 0) {
-        feedback = 'Nenhum aluno novo selecionado.';
+        feedback = 'Nenhum estudante novo selecionado.';
     } else {
-        feedback = `${novosSelecionados} ${novosSelecionados === 1 ? 'aluno novo selecionado' : 'alunos novos selecionados'} para adicionar.`;
+        feedback = `${novosSelecionados} ${novosSelecionados === 1 ? 'estudante novo selecionado' : 'estudantes novos selecionados'} para adicionar.`;
     }
 
     [
@@ -96,8 +96,8 @@ function atualizarAcoesSelecao() {
             const count = button.querySelector('[data-selection-count]');
             if (count) count.textContent = salvando ? 'Adicionando…' : nomeContagem;
             button.setAttribute('aria-label', salvando
-                ? 'Adicionando alunos à equipe'
-                : `Salvar alunos selecionados na equipe — ${nomeContagem}`);
+                ? 'Adicionando estudantes à equipe'
+                : `Salvar estudantes selecionados na equipe — ${nomeContagem}`);
             button.setAttribute('aria-busy', salvando ? 'true' : 'false');
             button.disabled = salvando || novosSelecionados === 0;
         }
@@ -175,12 +175,12 @@ async function lerJsonEstrito(response, mensagem) {
 
 function extrairCompetidores(data) {
     if (Array.isArray(data)) return data;
-    if (!data || typeof data !== 'object') throw new Error('Não foi possível carregar os alunos da turma.');
+    if (!data || typeof data !== 'object') throw new Error('Não foi possível carregar os estudantes da turma.');
     const lista = Array.isArray(data.competidores) ? data.competidores
         : (Array.isArray(data.usuarios) ? data.usuarios : null);
     if (!lista || !lista.every(aluno =>
         aluno && typeof aluno === 'object' && !Array.isArray(aluno) && aluno.id_usuario != null
-    )) throw new Error('Não foi possível carregar os alunos da turma.');
+        )) throw new Error('Não foi possível carregar os estudantes da turma.');
     return lista;
 }
 
@@ -216,6 +216,12 @@ async function carregar() {
     const idModalidade = params.get('id_modalidade');
     const nomeTurma = params.get('nome_turma') || '';
     const nomeModalidade = params.get('nome_modalidade') || '';
+    [['nomeModalidadeEquipeAlunos', nomeModalidade], ['nomeModalidadeEquipeAlunosMob', nomeModalidade]].forEach(([id, nome]) => {
+        const el = document.getElementById(id);
+        if (!el || !nome) return;
+        el.textContent = `Modalidade: ${nome}`;
+        el.classList.remove('d-none');
+    });
 
     const qVoltar = new URLSearchParams();
     if (idInterclasse) qVoltar.set('id', idInterclasse);
@@ -264,7 +270,7 @@ async function carregar() {
 
         const generoParam = (generoDaModalidade === 'MISTO' || generoDaModalidade === 'MISTA') ? '' : `&genero=${generoDaModalidade}`;
         const res = await fetch(`${API_BASE}/usuarios?acao=listar_competidores&id_turma=${idTurma}${generoParam}&_t=${ts}`);
-        const data = await lerJsonEstrito(res, 'Não foi possível carregar os alunos da turma.');
+        const data = await lerJsonEstrito(res, 'Não foi possível carregar os estudantes da turma.');
         alunos = extrairCompetidores(data);
         const idsDisponiveis = new Set(alunos.map(aluno => String(aluno.id_usuario)));
         alunosSelecionados = new Set([
@@ -280,7 +286,7 @@ async function carregar() {
         filtrar(termoBusca);
     } catch (error) {
         console.error("Erro ao carregar dados:", error);
-        erroCarregamento = error.message || 'Não foi possível carregar os alunos da turma.';
+        erroCarregamento = error.message || 'Não foi possível carregar os estudantes da turma.';
     } finally {
         carregando = false;
         if (rosterCarregado) {
@@ -312,14 +318,19 @@ async function tentarNovamente(event) {
     }
 }
 
-async function salvar() {
-    const checks = Array.from(document.querySelectorAll('.aluno-check:checked'));
-    const membros = new Set(alunosNaEquipe.map(aluno => String(aluno.id_usuario)));
-    const ids = [...new Set(checks.map(item => Number(item.value)).filter(Boolean))]
+function idsSelecionadosParaSalvar(selecionados, membrosDaEquipe) {
+    const membros = new Set(membrosDaEquipe.map(aluno => String(aluno.id_usuario)));
+    return [...selecionados]
+        .map(Number)
+        .filter(Boolean)
         .filter(id => !membros.has(String(id)));
+}
+
+async function salvar() {
+    const ids = idsSelecionadosParaSalvar(alunosSelecionados, alunosNaEquipe);
 
     if (!ids.length) {
-        mostrarToast('erro', 'Selecione pelo menos um novo aluno para adicionar.');
+        mostrarToast('erro', 'Selecione pelo menos um novo estudante para adicionar.');
         return;
     }
 
@@ -359,5 +370,5 @@ pageScope.listen(document.getElementById('buscaAlunosMobile'), 'input', sincroni
 
 pageScope.listen(window, 'pageshow', carregar);
 
-return {mostrarToast, cardAluno, renderizar, atualizarAcoesSelecao, filtrar, carregar, salvar};
+return {mostrarToast, cardAluno, renderizar, atualizarAcoesSelecao, filtrar, carregar, salvar, idsSelecionadosParaSalvar};
 });

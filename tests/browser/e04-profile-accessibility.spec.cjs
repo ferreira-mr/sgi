@@ -386,7 +386,7 @@ test.describe('E04 primeiro acesso e perfil do aluno', () => {
         await ensureStudentReady(page, aluno);
         await page.goto('aluno/perfil', { waitUntil: 'domcontentloaded' });
         await expect(page.locator('main:visible')).toContainText(aluno.matricula);
-        await expect(page.locator('main:visible')).toContainText('Aluno');
+        await expect(page.locator('main:visible')).toContainText('Estudante');
         await expect(page.getByText('E-mail', { exact: true })).toHaveCount(0);
         await expect(page.getByText('Online', { exact: true })).toHaveCount(0);
         await expect(page.getByText('Senha criptografada', { exact: true })).toHaveCount(0);
@@ -500,6 +500,7 @@ test.describe('E04 perfil administrativo', () => {
         test.setTimeout(180_000);
         await login(page, 'mesario', '123');
         await page.waitForURL(/\/painel\?id=\d+/, { timeout: 15_000 });
+        expect(await page.evaluate(() => window.SGI_SESSION_NIVEL)).toBe(2);
         await expect(page.locator('#sgi-offline-ok')).toBeVisible({ timeout: 120_000 });
         await expect(page.locator('#sgi-offline-ok')).toContainText('Pronto para uso offline');
 

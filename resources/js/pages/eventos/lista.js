@@ -252,11 +252,16 @@ pageScope.listen(document.getElementById('formulario'), 'submit', async (event) 
         document.getElementById('btnCriar').disabled = true;
         document.getElementById('btnCriar').innerText = "Criando...";
 
-        const res = await axios.post(`${API_BASE}edicoes`, novoInterclasse);
+        const res = await fetch(`${API_BASE}edicoes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(novoInterclasse)
+        });
+        const data = await res.json();
 
-        if (res.data && res.data.success) {
+        if (res.ok && data && data.success) {
             document.getElementById('caixaMensagem').innerHTML = '<p class="text-success text-center mt-3 mb-0 fw-bold">Criado com sucesso!</p>';
-            const idCriado = res.data.id;
+            const idCriado = data.id;
             await window.SGIInterclasse.refreshNavigation();
             document.getElementById('formulario').reset();
             listarInterclasses();
@@ -264,7 +269,7 @@ pageScope.listen(document.getElementById('formulario'), 'submit', async (event) 
                 window.location.href = urlPainel(idCriado);
             }, 800);
         } else {
-            throw new Error(res.data ? res.data.message : "Erro interno no servidor ao salvar.");
+            throw new Error(data ? data.message : "Erro interno no servidor ao salvar.");
         }
     } catch (error) {
         const msgErro = error.response?.data?.message || error.message || "Erro desconhecido";

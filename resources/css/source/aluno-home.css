@@ -1,12 +1,1 @@
-/* Bootstrap supplies the avatar treatment; only the domain-specific size remains. */
-.perfil-avatar-ring {
-    width: 150px;
-    height: 150px;
-}
-
-@media (max-width: 767.98px) {
-    .perfil-avatar-ring {
-        width: 130px;
-        height: 130px;
-    }
-}
+/* Avatar dimension token (.perfil-avatar-ring) consolidated in resources/scss/shared.scss */

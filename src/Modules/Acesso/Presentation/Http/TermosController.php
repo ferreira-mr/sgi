@@ -29,7 +29,7 @@ final class TermosController
             if ($method === 'GET') {
                 $result = $service->consultar($idUsuario);
                 if ($result === null) {
-                    return \App\Shared\Http\Response::json(['success' => false, 'message' => 'Aluno não cadastrado.'], $status, $headers);
+                    return \App\Shared\Http\Response::json(['success' => false, 'message' => 'Estudante não cadastrado.'], $status, $headers);
                 }
                 return \App\Shared\Http\Response::json(['success' => true, ...$result], $status, $headers);
             }
@@ -38,8 +38,8 @@ final class TermosController
                 $response = match ($result['status']) {
                     'accepted' => ['success' => true, 'message' => 'Termos aceitos com sucesso!', 'exige_troca_senha' => $result['exige_troca_senha'] ?? false],
                     'already_accepted' => ['success' => true, 'message' => 'Usuário já aceitou os termos.', 'exige_troca_senha' => $result['exige_troca_senha'] ?? false],
-                    'no_edition' => ['success' => false, 'message' => 'Aluno não possui um Interclasse vinculado e não há edição ativa.'],
-                    default => ['success' => false, 'message' => 'Aluno não cadastrado.'],
+                    'no_edition' => ['success' => false, 'message' => 'Estudante não possui um Interclasse vinculado e não há edição ativa.'],
+                    default => ['success' => false, 'message' => 'Estudante não cadastrado.'],
                 };
                 return \App\Shared\Http\Response::json($response, $status, $headers);
             }

@@ -34,6 +34,7 @@ if ((int) ($_SESSION['nivel'] ?? -1) >= 0) {
     <?php endif; ?>
 </head>
 <body>
+    <a class="sgi-skip-link" href="#form_desktop">Ir para o conteúdo</a>
     <!-- VERSÃO MOBILE CENTRALIZADA -->
     <main class="d-md-none min-vh-100 d-flex flex-column align-items-center text-center login-mobile-layout">
         <div class="login-mobile-banner" role="img" aria-label="Imagem dos desenvolvedores">
@@ -53,7 +54,7 @@ if ((int) ($_SESSION['nivel'] ?? -1) >= 0) {
                 Procure a organização responsável pelo Interclasses para solicitar a redefinição do acesso.
             </div>
             <button type="submit" class="btn btn-primary w-100 login-mobile-button">Entrar</button>
-            <div id="msg_erro_mobile" class="text-danger mt-2" aria-live="polite"></div>
+            <div id="msg_erro_mobile" class="text-danger mt-2" aria-live="polite" tabindex="-1"></div>
             <div class="login-mobile-brand">
                 <img src="<?= \App\Shared\Http\Assets::url('images/logo-sgi-sesi.png') ?>" alt="Logo do SESI">
             </div>
@@ -84,7 +85,7 @@ if ((int) ($_SESSION['nivel'] ?? -1) >= 0) {
                     Procure a organização responsável pelo Interclasses para solicitar a redefinição do acesso.
                 </div>
                 <button type="submit" class="btn btn-primary w-100 mt-2 login-desktop-button">Entrar</button>
-                <div id="msg_erro_desktop" class="text-danger mt-2" aria-live="polite"></div>
+                <div id="msg_erro_desktop" class="text-danger mt-2" aria-live="polite" tabindex="-1"></div>
             </form>
         </section>
     </main>

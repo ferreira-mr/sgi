@@ -153,10 +153,9 @@ class InscricaoModalidadesTest
             'id_equipes' => [$femaleTeam['team'], $maleTeam['team']],
         ]);
         Assertions::assert(
-            'POST direto mantém o lote parcial: MASC entra na modalidade MASC e a FEM é recusada',
-            ($genderBatch['code'] ?? 0) === 200
-                && ($genderBatch['json']['success'] ?? false) === true
-                && (int) ($genderBatch['json']['insercoes'] ?? 0) === 1
+            'POST direto rejeita o lote inteiro quando uma modalidade é inválida',
+            ($genderBatch['code'] ?? 0) === 409
+                && ($genderBatch['json']['success'] ?? true) === false
                 && self::hasErrorContaining($genderBatch, 'gênero'),
             (string) ($genderBatch['body'] ?? ''),
         );
@@ -165,9 +164,15 @@ class InscricaoModalidadesTest
             !self::hasMembership($database, $femaleTeam['team'], $male['id']),
         );
         Assertions::assert(
-            'Modalidade MASC compatível mantém a inscrição do lote',
-            self::hasMembership($database, $maleTeam['team'], $male['id']),
+            'Modalidade MASC compatível não é gravada pelo lote rejeitado',
+            !self::hasMembership($database, $maleTeam['team'], $male['id']),
         );
+
+        $validMale = $maleClient->postJson('api/v1/inscricoes', [
+            'id_interclasse' => $editionId,
+            'id_equipes' => [$maleTeam['team']],
+        ]);
+        Assertions::assert('Inscrição válida posterior ao lote rejeitado é aceita', ($validMale['code'] ?? 0) === 200 && ($validMale['json']['success'] ?? false) === true);
 
         $sameInscriptionRetry = $maleClient->postJson('api/v1/inscricoes', [
             'id_interclasse' => $editionId,
@@ -214,11 +219,9 @@ class InscricaoModalidadesTest
             'id_equipes' => [$wrongCategoryTeam['team'], $mixedTeam['team']],
         ]);
         Assertions::assert(
-            'Erro de categoria é reportado junto com a modalidade MISTO já existente',
-            ($scopeBatch['code'] ?? 0) === 200
-                && ($scopeBatch['json']['success'] ?? false) === true
-                && (int) ($scopeBatch['json']['insercoes'] ?? -1) === 0
-                && (int) ($scopeBatch['json']['ja_existentes'] ?? 0) === 1
+            'Erro de categoria rejeita o lote sem alterar modalidade já existente',
+            ($scopeBatch['code'] ?? 0) === 409
+                && ($scopeBatch['json']['success'] ?? true) === false
                 && self::hasErrorContaining($scopeBatch, 'categoria'),
             (string) ($scopeBatch['body'] ?? ''),
         );

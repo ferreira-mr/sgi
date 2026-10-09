@@ -22,7 +22,7 @@ final class RankingController
     {
         if ($request->method() === 'OPTIONS') {
             return Response::empty(204, [
-                'Access-Control-Allow-Methods' => 'GET, PUT, OPTIONS',
+                'Access-Control-Allow-Methods' => 'GET, POST, PUT, OPTIONS',
                 'Access-Control-Allow-Headers' => 'Content-Type, Authorization',
             ]);
         }
@@ -35,6 +35,7 @@ final class RankingController
         try {
             return match ($request->method()) {
                 'GET' => $this->list($request),
+                'POST' => $this->handlePost($request),
                 'PUT' => $this->update($request),
                 default => Response::json(['success' => false, 'message' => 'Método não permitido.'], 405),
             };
@@ -45,6 +46,37 @@ final class RankingController
 
             return Response::json(['success' => false, 'message' => 'Não foi possível processar o ranking.'], 500);
         }
+    }
+
+    private function handlePost(Request $request): Response
+    {
+        $authorization = AccessGuard::authorize([0]);
+        if ($authorization !== null) {
+            return $authorization;
+        }
+
+        $writeDenied = AccessGuard::requireWrite();
+        if ($writeDenied !== null) {
+            return $writeDenied;
+        }
+
+        $editionId = (int) ($request->input('id_interclasse') ?? $request->query('id_interclasse', 0));
+        if ($editionId <= 0) {
+            return Response::json(['success' => false, 'message' => 'O ID da edição é obrigatório.'], 400);
+        }
+
+        $action = (string) ($request->input('acao') ?? $request->query('acao', 'reconciliar'));
+        if ($action !== 'reconciliar') {
+            return Response::json(['success' => false, 'message' => 'Ação não suportada.'], 400);
+        }
+
+        $resultado = $this->service->reconciliar($editionId);
+
+        return Response::json([
+            'success' => true,
+            'message' => 'Ranking recalculado e reconciliado com sucesso!',
+            'dados' => $resultado,
+        ]);
     }
 
     private function list(Request $request): Response

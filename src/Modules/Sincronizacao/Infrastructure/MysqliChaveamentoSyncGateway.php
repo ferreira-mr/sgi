@@ -21,6 +21,8 @@ use RuntimeException;
 
 final class MysqliChaveamentoSyncGateway
 {
+    private ?bool $planningAvailable = null;
+
     private readonly TransactionRunner $transactions;
     private readonly PontuacaoService $pontuacao;
     private readonly IndividualRankingService $individual;
@@ -114,6 +116,7 @@ final class MysqliChaveamentoSyncGateway
                 throw new \InvalidArgumentException('Nenhum jogo enviado para sincronização de mata-mata.');
             }
             $validation = $this->validateMataMataPayload($modalityId, $games);
+            $this->assertPublishedPlanDoesNotGainParallelGames($modalityId, $validation['games']);
             $games = $validation['games'];
             $processed = 0;
             foreach ($games as $game) {
@@ -172,6 +175,56 @@ final class MysqliChaveamentoSyncGateway
             }
             return ['success' => true, 'message' => 'Sincronização de chaveamento Mata-Mata realizada com sucesso.', 'jogos_sincronizados' => $processed];
         });
+    }
+
+    /**
+     * Persisted offline batches may still update legacy games that already
+     * exist. They cannot introduce a second bracket after a calendar is
+     * published; temporary planned results reconcile through /resultados.
+     *
+     * @param list<array{existing_id:?int}> $games
+     */
+    private function assertPublishedPlanDoesNotGainParallelGames(int $modalityId, array $games): void
+    {
+        if (!$this->planningAvailable()) {
+            return;
+        }
+        $published = $this->one(
+            "SELECT 1 AS published
+             FROM modalidades m
+             INNER JOIN interclasse_planejamentos ip ON ip.id_interclasse = m.interclasses_id_interclasse
+             WHERE m.id_modalidade = ?
+               AND ip.cronograma_status = 'publicado'
+               AND ip.versao_publicada IS NOT NULL
+             LIMIT 1",
+            'i',
+            [$modalityId],
+        );
+        if ($published === null) {
+            return;
+        }
+        foreach ($games as $game) {
+            if ($game['existing_id'] === null) {
+                throw new \InvalidArgumentException('O calendário publicado é a única fonte para criar os jogos desta edição.');
+            }
+        }
+    }
+
+    private function planningAvailable(): bool
+    {
+        if ($this->planningAvailable !== null) {
+            return $this->planningAvailable;
+        }
+        $result = $this->connection->query(
+            "SELECT COUNT(*) AS total FROM information_schema.tables
+             WHERE table_schema = DATABASE() AND table_name = 'interclasse_planejamentos'",
+        );
+        if ($result === false) {
+            return $this->planningAvailable = false;
+        }
+        $row = $result->fetch_assoc();
+        $result->free();
+        return $this->planningAvailable = ((int) ($row['total'] ?? 0) > 0);
     }
 
     /**

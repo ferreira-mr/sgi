@@ -1,0 +1,71 @@
+name: ${COMPOSE_PROJECT_NAME:-sgi-homologacao-limpa}
+
+services:
+  db:
+    image: mariadb:10.11
+    environment:
+      MARIADB_ROOT_PASSWORD: ${SGI_HML_DB_PASSWORD:?Defina SGI_HML_DB_PASSWORD em .env.homologacao}
+      MARIADB_DATABASE: sgi_homologacao
+    volumes:
+      - homologacao_db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+      args:
+        PHP_VERSION: "8.4"
+    working_dir: /app
+    environment:
+      SGI_APP_ENV: homologation
+      SGI_APP_DEBUG: "0"
+      SGI_APP_URL: ${SGI_HML_APP_URL:?Defina SGI_HML_APP_URL em .env.homologacao}
+      SGI_BASE_PATH: ""
+      SGI_DB_HOST: db
+      SGI_DB_PORT: "3306"
+      SGI_DB_NAME: sgi_homologacao
+      SGI_DB_USER: root
+      SGI_DB_PASSWORD: ${SGI_HML_DB_PASSWORD:?Defina SGI_HML_DB_PASSWORD em .env.homologacao}
+      SGI_UPLOAD_DIR: /var/lib/sgi/uploads
+      SGI_REGULAMENTOS_DIR: /var/lib/sgi/uploads/regulamentos
+      SGI_FOTOS_DIR: /var/lib/sgi/uploads/fotos
+      SGI_IMPORT_DIR: /var/lib/sgi/imports
+      SGI_SESSION_DIR: /var/lib/sgi/sessions
+      SGI_HML_ADMIN_LOGIN: ${SGI_HML_ADMIN_LOGIN:?Defina SGI_HML_ADMIN_LOGIN em .env.homologacao}
+      SGI_HML_ADMIN_NAME: ${SGI_HML_ADMIN_NAME:?Defina SGI_HML_ADMIN_NAME em .env.homologacao}
+      SGI_HML_ADMIN_PASSWORD: ${SGI_HML_ADMIN_PASSWORD:?Defina SGI_HML_ADMIN_PASSWORD em .env.homologacao}
+    volumes:
+      - homologacao_data:/var/lib/sgi
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${SGI_HML_BIND_ADDRESS:-0.0.0.0}:${SGI_HML_HOST_PORT:-8100}:8099"
+    entrypoint: ["/bin/sh", "-lc"]
+    command:
+      - >-
+        mkdir -p /var/lib/sgi/uploads/regulamentos /var/lib/sgi/uploads/fotos
+        /var/lib/sgi/imports /var/lib/sgi/sessions /var/lib/sgi/upload-tmp
+        && php -d session.save_path=/var/lib/sgi/sessions bin/sgi.php migrate
+        && php -d session.save_path=/var/lib/sgi/sessions -r '
+        require "/app/bootstrap/autoload.php";
+        $$db = App\Shared\Database\ConnectionFactory::get();
+        $$count = (int) $$db->query("SELECT COUNT(*) FROM usuarios")->fetch_row()[0];
+        if ($$count === 0) {
+          putenv("SGI_ADMIN_LOGIN=" . getenv("SGI_HML_ADMIN_LOGIN"));
+          putenv("SGI_ADMIN_NAME=" . getenv("SGI_HML_ADMIN_NAME"));
+          putenv("SGI_ADMIN_PASSWORD=" . getenv("SGI_HML_ADMIN_PASSWORD"));
+          $$id = (new App\Modules\Acesso\Infrastructure\InitialAdminProvisioner($$db))->create(getenv("SGI_HML_ADMIN_LOGIN"), getenv("SGI_HML_ADMIN_NAME"), getenv("SGI_HML_ADMIN_PASSWORD"));
+          fwrite(STDOUT, "Administrador de homologação criado: " . $$id . "\n");
+        }
+        ' && php -d session.save_path=/var/lib/sgi/sessions -d upload_tmp_dir=/var/lib/sgi/upload-tmp -d display_errors=0 -d log_errors=1 -d error_log=/proc/self/fd/2 -S 0.0.0.0:8099 -t public public/index.php
+
+volumes:
+  homologacao_db:
+  homologacao_data:

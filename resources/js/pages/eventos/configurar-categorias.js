@@ -324,6 +324,15 @@ window.SGIPage.mount("eventos/configurar-categorias", function (pageConfig, page
         }
     };
 
+    ['btnEditarCategoriaMobile', 'btnEditarCategoriaDesktop'].forEach((id) => {
+        const btnEdit = document.getElementById(id);
+        if (btnEdit) pageScope.listen(btnEdit, 'click', (ev) => window.abrirModalEditarCategoria(ev));
+    });
+    ['btnExcluirCategoriaMobile', 'btnExcluirCategoriaDesktop'].forEach((id) => {
+        const btnDel = document.getElementById(id);
+        if (btnDel) pageScope.listen(btnDel, 'click', () => window.excluirCategoria());
+    });
+
     // Lógica para enviar Nova Categoria para a API
     pageScope.listen(document.getElementById('formNovaCategoria'), 'submit', async (e) => {
         e.preventDefault();

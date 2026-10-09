@@ -1,11 +1,10 @@
 :root {
   --sgi-sidebar-width: 5.75rem;
+  /* Referência documental do ponto de corte compacto (variáveis CSS não operam em @media). */
   --sgi-compact-breakpoint: 1200px;
   --sgi-offline-banner-height: 0px;
 
   --aluno-primary: var(--bs-primary);
-  --aluno-radius-lg: 16px;
-  --aluno-radius-xl: 24px;
 }
 
 .sgi-offline-banner {
@@ -132,6 +131,12 @@ body {
   width: var(--sgi-sidebar-width);
   inset-block: 0;
   z-index: 1030;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .sidebar-nav-list {
@@ -139,7 +144,34 @@ body {
   justify-content: space-between;
   overflow-x: hidden;
   overflow-y: auto;
-  scrollbar-width: thin;
+  scrollbar-width: none;
+}
+
+.sidebar-nav-list::-webkit-scrollbar {
+  display: none;
+}
+
+.sidebar-nav .sidebar-nav-list li {
+  flex-shrink: 0;
+}
+
+@media (max-height: 700px) {
+  .sidebar-nav .sidebar-nav-list {
+    gap: 0.5rem !important;
+    font-size: 1.25rem !important;
+  }
+}
+
+.perfil-avatar-ring {
+  width: 150px;
+  height: 150px;
+}
+
+@media (max-width: 767.98px) {
+  .perfil-avatar-ring {
+    width: 130px;
+    height: 130px;
+  }
 }
 
 .sgi-skip-link {
@@ -532,6 +564,12 @@ body {
   flex-shrink: 0;
 }
 
+/* O Bootstrap aplica `display: flex !important` em `.d-md-flex`. A classe
+   explícita garante que a casca não volte a aparecer nas telas filhas da SPA. */
+.sgi-app-shell .sgi-mesario-topbar.sgi-mesario-topbar--oculta {
+  display: none !important;
+}
+
 @media print {
   body:has(.sgi-ranking-page) {
     background: #fff !important;
@@ -588,21 +626,21 @@ body {
 }
 
 .sgi-podium-badge--1 {
-  background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);
-  color: #fff;
+  background: linear-gradient(135deg, #fde68a 0%, #f59e0b 100%);
+  color: #451a03;
   box-shadow: 0 4px 12px rgba(245, 158, 11, .35);
   border: 2px solid #fef3c7;
 }
 
 .sgi-podium-badge--2 {
-  background: linear-gradient(135deg, #94a3b8 0%, #475569 100%);
+  background: linear-gradient(135deg, #64748b 0%, #334155 100%);
   color: #fff;
   box-shadow: 0 4px 12px rgba(100, 116, 139, .3);
   border: 2px solid #f1f5f9;
 }
 
 .sgi-podium-badge--3 {
-  background: linear-gradient(135deg, #d97706 0%, #78350f 100%);
+  background: linear-gradient(135deg, #b45309 0%, #78350f 100%);
   color: #fff;
   box-shadow: 0 4px 12px rgba(180, 83, 9, .3);
   border: 2px solid #ffedd5;

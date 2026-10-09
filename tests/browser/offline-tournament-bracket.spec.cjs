@@ -250,7 +250,8 @@ test.describe('Torneio Offline e Inspeção da Árvore de Chaveamento', () => {
             window.__SGI_SPA__.navegarPara('chaveamento', { id: idInter });
         }, fixture.idInterclasse);
 
-        await page.waitForTimeout(2000);
+        await expect(page.locator('#bracketArea')).toBeAttached({ timeout: 10_000 });
+        await expect(page.locator('#selectModalidade')).toBeAttached({ timeout: 10_000 });
 
         // 9. Inspeciona o DOM da tela chaveamento
         const domInfo = await page.evaluate(() => {

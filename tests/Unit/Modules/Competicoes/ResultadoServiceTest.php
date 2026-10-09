@@ -471,6 +471,16 @@ final class PodioRepositoryFake implements PodioRepository
     public function invalidarFontesSemOrigemAtual(int $interclasseId, int $modalidadeId): void
     {
     }
+
+    public function pontosPadraoEdicao(int $interclasseId): array
+    {
+        return [1 => 10, 2 => 7, 3 => 5];
+    }
+
+    public function carregarPodioModalidade(int $interclasseId, int $modalidadeId): array
+    {
+        return [];
+    }
 }
 
 final class TransactionRunnerFake implements TransactionRunner

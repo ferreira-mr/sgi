@@ -28,6 +28,15 @@ final class MysqliPortalAlunoRepository
         $statement->execute();
         $subscriptions = $statement->get_result()->fetch_all(MYSQLI_ASSOC);
         $statement->close();
+        $planning = null;
+        $table = $this->connection->query("SELECT COUNT(*) AS total FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'interclasse_planejamentos'");
+        if ($table !== false && (int) ($table->fetch_assoc()['total'] ?? 0) > 0) {
+            $statement = $this->connection->prepare('SELECT cronograma_versao, versao_publicada, cronograma_status, inscricoes_status FROM interclasse_planejamentos WHERE id_interclasse = ? LIMIT 1');
+            $statement->bind_param('i', $editionId);
+            $statement->execute();
+            $planning = $statement->get_result()->fetch_assoc() ?: null;
+            $statement->close();
+        }
         return [
             'id_usuario' => $userId,
             'genero_usuario' => $user['genero_usuario'] ?? 'MASC',
@@ -35,6 +44,10 @@ final class MysqliPortalAlunoRepository
             'turma_usuario' => (int) ($user['id_turma'] ?? 0),
             'idInterclassePagina' => $editionId,
             'modalidades_inscritas' => $subscriptions,
+            'cronograma_versao' => $planning === null ? null : (int) $planning['cronograma_versao'],
+            'versao_publicada' => $planning === null || $planning['versao_publicada'] === null ? null : (int) $planning['versao_publicada'],
+            'cronograma_status' => $planning['cronograma_status'] ?? null,
+            'inscricoes_status' => $planning['inscricoes_status'] ?? null,
         ];
     }
 }

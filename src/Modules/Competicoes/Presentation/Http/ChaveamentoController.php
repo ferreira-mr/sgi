@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Competicoes\Presentation\Http;
 
 use App\Modules\Acesso\Presentation\Http\CompetitionAccess;
+use App\Modules\Competicoes\Application\ChaveamentoGenerationDisabledException;
 use App\Modules\Competicoes\Application\ChaveamentoService;
 use App\Modules\Competicoes\Domain\TipoCompeticaoRules;
 use App\Shared\Http\AccessGuard;
@@ -95,6 +96,8 @@ final class ChaveamentoController
         } catch (\mysqli_sql_exception $exception) {
             error_log('Falha de persistência no chaveamento: ' . $exception->getMessage());
             return Response::json(['success' => false, 'message' => 'Não foi possível processar o chaveamento.'], 500);
+        } catch (ChaveamentoGenerationDisabledException $exception) {
+            return Response::json(['success' => false, 'code' => ChaveamentoGenerationDisabledException::CODE, 'message' => $exception->getMessage()], 409);
         } catch (\InvalidArgumentException|\RuntimeException $exception) {
             return Response::json(['success' => false, 'message' => $exception->getMessage()], 400);
         }

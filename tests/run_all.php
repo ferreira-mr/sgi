@@ -43,11 +43,13 @@ require_once __DIR__ . '/Integration/TurmaScopeConsistencyTest.php';
 require_once __DIR__ . '/Integration/PublicBoundaryTest.php';
 require_once __DIR__ . '/Integration/RefactorContractsTest.php';
 require_once __DIR__ . '/Integration/MigrationsTest.php';
+require_once __DIR__ . '/Integration/CronogramaPlanejadoTest.php';
 require_once __DIR__ . '/Integration/MigrationSupportTest.php';
 require_once __DIR__ . '/Integration/RecoveryRehearsalTest.php';
 require_once __DIR__ . '/Integration/ConsistencyGuardsTest.php';
 require_once __DIR__ . '/Integration/InitialAdminTest.php';
 require_once __DIR__ . '/Integration/StudentPasswordInitializerTest.php';
+require_once __DIR__ . '/Integration/FullInterclasseSimulationTest.php';
 require_once __DIR__ . '/Integration/AtomicMutationTest.php';
 require_once __DIR__ . '/Integration/MataMataEdgeCasesTest.php';
 require_once __DIR__ . '/E2E/FullOfflineTournamentTest.php';
@@ -92,6 +94,9 @@ Assertions::reset();
 
 $testBaseUrl = getenv('SGI_TEST_BASE_URL');
 $testDatabase = getenv('SGI_TEST_DB_NAME') ?: 'sgi_test';
+$scenarioFilter = trim((string) (getenv('SGI_TEST_INTEGRATION_SCENARIO') ?: ''));
+$simulationPhase = trim((string) (getenv('SGI_SIMULATION_PHASE') ?: 'complete'));
+$preserveSimulationDatabase = getenv('SGI_TEST_PRESERVE_DATABASE') === '1';
 
 if ($testBaseUrl === false || trim($testBaseUrl) === '') {
     fwrite(STDERR, "SGI_TEST_BASE_URL é obrigatório. Inicie um servidor de teste separado antes da suíte.\n");
@@ -100,7 +105,14 @@ if ($testBaseUrl === false || trim($testBaseUrl) === '') {
 
 try {
     TestDatabase::assertDisposableContainerRuntime();
-    TestDatabase::resetFromSchema($testDatabase);
+    if ($preserveSimulationDatabase) {
+        if ($scenarioFilter !== 'FullInterclasseSimulationTest' || $simulationPhase !== 'finalize') {
+            throw new RuntimeException('A preservação de banco só é permitida na fase finalize da simulação integral.');
+        }
+        TestDatabase::assertExistingDisposableDatabase($testDatabase);
+    } else {
+        TestDatabase::resetFromSchema($testDatabase);
+    }
 } catch (Throwable $e) {
     fwrite(STDERR, "Falha ao preparar ambiente de teste: " . $e->getMessage() . "\n");
     exit(2);
@@ -111,84 +123,120 @@ echo "\033[1;36m       SGI — SUITE COMPLETA DE TESTES AUTOMATIZADOS E AUDITORI
 echo "\033[1;36m====================================================================\033[0m\n";
 
 $aborted = false;
+$scenarioDurations = [];
+$deferSimulation = filter_var(getenv('SGI_TEST_DEFER_SIMULATION') ?: '0', FILTER_VALIDATE_BOOL);
+$suiteStartedAtUtc = gmdate('c');
+$suiteStartedAt = hrtime(true);
+$runScenario = static function (string $name, callable $scenario) use (&$scenarioDurations): mixed {
+    $startedAt = hrtime(true);
+    $status = 'completed';
+    try {
+        return $scenario();
+    } catch (Throwable $exception) {
+        $status = 'failed';
+        throw $exception;
+    } finally {
+        $duration = round((hrtime(true) - $startedAt) / 1_000_000_000, 3);
+        $scenarioDurations[] = [
+            'name' => $name,
+            'duration_seconds' => $duration,
+            'status' => $status,
+        ];
+        printf("[TEMPO] %s: %.3fs (%s)\n", $name, $duration, $status);
+    }
+};
+
 try {
+    if ($scenarioFilter === 'FullInterclasseSimulationTest') {
+        echo "Executando somente FullInterclasseSimulationTest dentro do container descartável.\n";
+        $runScenario('FullInterclasseSimulationTest', static fn () => \SGITests\Integration\FullInterclasseSimulationTest::run());
+    } elseif ($scenarioFilter !== '') {
+        throw new RuntimeException('Filtro de integração desconhecido; o único cenário focal habilitado é FullInterclasseSimulationTest.');
+    } else {
     // 0. Fixtures sintéticas das regressões da auditoria
-    AuditFixturesTest::run();
-    MesarioResourceScopeTest::run();
-    TemporaryResolutionScopeTest::run();
-    ExceptionEnvelopeTest::run();
+    $runScenario('AuditFixturesTest', static fn () => AuditFixturesTest::run());
+    $runScenario('MesarioResourceScopeTest', static fn () => MesarioResourceScopeTest::run());
+    $runScenario('TemporaryResolutionScopeTest', static fn () => TemporaryResolutionScopeTest::run());
+    $runScenario('ExceptionEnvelopeTest', static fn () => ExceptionEnvelopeTest::run());
 
     // 1. Autenticação e RBAC
-    AuthAndRbacTest::run();
+    $runScenario('AuthAndRbacTest', static fn () => AuthAndRbacTest::run());
 
     // 2. Ciclo de vida da edição
-    $idEdicao = InterclasseLifecycleTest::run();
+    $idEdicao = $runScenario('InterclasseLifecycleTest', static fn () => InterclasseLifecycleTest::run());
 
     // 3. Turmas e importação de PDF
-    $idTurma = TurmasAndPdfImportTest::run($idEdicao);
-    FirstLoginPasswordChangeTest::run($idEdicao);
-    PontuacaoReconciliationTest::run($idEdicao, $idTurma);
-    ArrecadacaoConsistencyTest::run($idEdicao, $idTurma);
+    $idTurma = $runScenario('TurmasAndPdfImportTest', static fn () => TurmasAndPdfImportTest::run($idEdicao));
+    $runScenario('FirstLoginPasswordChangeTest', static fn () => FirstLoginPasswordChangeTest::run($idEdicao));
+    $runScenario('PontuacaoReconciliationTest', static fn () => PontuacaoReconciliationTest::run($idEdicao, $idTurma));
+    $runScenario('ArrecadacaoConsistencyTest', static fn () => ArrecadacaoConsistencyTest::run($idEdicao, $idTurma));
 
     // 4. Modalidades e Equipes
-    $dadosMod = ModalidadesAndEquipesTest::run($idEdicao);
+    $dadosMod = $runScenario('ModalidadesAndEquipesTest', static fn () => ModalidadesAndEquipesTest::run($idEdicao));
     $mod = $dadosMod['modalidade'];
     $equipes = $dadosMod['equipes'];
     $idModalidade = (int) $mod['id_modalidade'];
 
     // 5. Inscrição em Modalidades e Limites
-    InscricaoModalidadesTest::run($idEdicao, $equipes);
+    $runScenario('InscricaoModalidadesTest', static fn () => InscricaoModalidadesTest::run($idEdicao, $equipes));
 
     // 6. Agendamento e Conflitos
-    $dadosJogos = JogosAndConflitosTest::run($idEdicao, $idModalidade, $equipes);
+    $dadosJogos = $runScenario('JogosAndConflitosTest', static fn () => JogosAndConflitosTest::run($idEdicao, $idModalidade, $equipes));
     $idJogo1 = $dadosJogos['id_jogo_1'];
     $idJogo2 = $dadosJogos['id_jogo_2'];
     $equipesIds = $dadosJogos['equipes_ids'];
-    AgendamentoBlocoTest::run($idEdicao, $idModalidade, $dadosJogos);
-    AgendamentoSequencialTest::run($idEdicao, $idModalidade, $dadosJogos);
-    ConcurrentScheduleTest::run($idEdicao, $idModalidade, $dadosJogos);
+    $runScenario('AgendamentoBlocoTest', static fn () => AgendamentoBlocoTest::run($idEdicao, $idModalidade, $dadosJogos));
+    $runScenario('AgendamentoSequencialTest', static fn () => AgendamentoSequencialTest::run($idEdicao, $idModalidade, $dadosJogos));
+    $runScenario('ConcurrentScheduleTest', static fn () => ConcurrentScheduleTest::run($idEdicao, $idModalidade, $dadosJogos));
 
     // 6.1 Persistência e replay do cronômetro
-    CronometroPersistenceTest::run($idModalidade, $idJogo1);
+    $runScenario('CronometroPersistenceTest', static fn () => CronometroPersistenceTest::run($idModalidade, $idJogo1));
 
     // 7. Placar e Artilharia
-    PlacarAndArtilhariaTest::run($idJogo1, $idModalidade, $equipesIds, $idEdicao);
-    \SGITests\Integration\AtomicMutationTest::run($idJogo1);
+    $runScenario('PlacarAndArtilhariaTest', static fn () => PlacarAndArtilhariaTest::run($idJogo1, $idModalidade, $equipesIds, $idEdicao));
+    $runScenario('AtomicMutationTest', static fn () => \SGITests\Integration\AtomicMutationTest::run($idJogo1));
 
     // 8. Ocorrências e Ranking
-    OcorrenciasAndRankingTest::run($idEdicao, $idTurma);
+    $runScenario('OcorrenciasAndRankingTest', static fn () => OcorrenciasAndRankingTest::run($idEdicao, $idTurma));
 
     // 9. Histórico de Turma e Pódios
-    HistoricoTurmaAndClassificacaoTest::run($idEdicao, $idTurma, $idModalidade);
+    $runScenario('HistoricoTurmaAndClassificacaoTest', static fn () => HistoricoTurmaAndClassificacaoTest::run($idEdicao, $idTurma, $idModalidade));
 
     // 10. Gestão de Fotos e Perfil
-    FotoPerfilAndUsuariosTest::run($idTurma, $idEdicao);
+    $runScenario('FotoPerfilAndUsuariosTest', static fn () => FotoPerfilAndUsuariosTest::run($idTurma, $idEdicao));
 
     // 11. Portal do Aluno
-    AlunosPortalTest::run();
-    RankingPublicationTest::run();
-    TurmaScopeConsistencyTest::run();
+    $runScenario('AlunosPortalTest', static fn () => AlunosPortalTest::run());
+    $runScenario('RankingPublicationTest', static fn () => RankingPublicationTest::run());
+    $runScenario('TurmaScopeConsistencyTest', static fn () => TurmaScopeConsistencyTest::run());
 
     // 12. Casos Limites do Motor de Chaveamento
-    MataMataEdgeCasesTest::run($idEdicao, $idTurma, $idJogo1, $idModalidade, $equipesIds);
+    $runScenario('MataMataEdgeCasesTest', static fn () => MataMataEdgeCasesTest::run($idEdicao, $idTurma, $idJogo1, $idModalidade, $equipesIds));
 
     // 13. Torneio Completo e Sincronização Offline
-    FullOfflineTournamentTest::run($idEdicao, $idModalidade, $idJogo2, $equipesIds);
-    PodiumCreditTest::run($idEdicao, $idModalidade, $equipesIds);
-    IndividualSyncCreditTest::run($idEdicao, $idModalidade);
-    HistoryRankingReconciliationTest::run($idEdicao, $idTurma);
-    ConcurrentInvariantsTest::run($idEdicao, $idTurma);
-    ConcurrentPontoFinalizationTest::run($idEdicao, $idTurma);
+    $runScenario('FullOfflineTournamentTest', static fn () => FullOfflineTournamentTest::run($idEdicao, $idModalidade, $idJogo2, $equipesIds));
+    $runScenario('PodiumCreditTest', static fn () => PodiumCreditTest::run($idEdicao, $idModalidade, $equipesIds));
+    $runScenario('IndividualSyncCreditTest', static fn () => IndividualSyncCreditTest::run($idEdicao, $idModalidade));
+    $runScenario('HistoryRankingReconciliationTest', static fn () => HistoryRankingReconciliationTest::run($idEdicao, $idTurma));
+    $runScenario('ConcurrentInvariantsTest', static fn () => ConcurrentInvariantsTest::run($idEdicao, $idTurma));
+    $runScenario('ConcurrentPontoFinalizationTest', static fn () => ConcurrentPontoFinalizationTest::run($idEdicao, $idTurma));
 
     // 14. Fronteira pública e proteção de arquivos internos
-    PublicBoundaryTest::run();
-    \SGITests\Integration\RefactorContractsTest::run();
-    \SGITests\Integration\MigrationsTest::run();
-    \SGITests\Integration\MigrationSupportTest::run();
-    \SGITests\Integration\RecoveryRehearsalTest::run();
-    \SGITests\Integration\ConsistencyGuardsTest::run();
-    \SGITests\Integration\InitialAdminTest::run();
-    \SGITests\Integration\StudentPasswordInitializerTest::run();
+    $runScenario('PublicBoundaryTest', static fn () => PublicBoundaryTest::run());
+    $runScenario('RefactorContractsTest', static fn () => \SGITests\Integration\RefactorContractsTest::run());
+    $runScenario('MigrationsTest', static fn () => \SGITests\Integration\MigrationsTest::run());
+    $runScenario('MigrationSupportTest', static fn () => \SGITests\Integration\MigrationSupportTest::run());
+    $runScenario('RecoveryRehearsalTest', static fn () => \SGITests\Integration\RecoveryRehearsalTest::run());
+    $runScenario('ConsistencyGuardsTest', static fn () => \SGITests\Integration\ConsistencyGuardsTest::run());
+    $runScenario('InitialAdminTest', static fn () => \SGITests\Integration\InitialAdminTest::run());
+    $runScenario('StudentPasswordInitializerTest', static fn () => \SGITests\Integration\StudentPasswordInitializerTest::run());
+    if (!$deferSimulation) {
+        $runScenario('FullInterclasseSimulationTest', static fn () => \SGITests\Integration\FullInterclasseSimulationTest::run());
+    } else {
+        echo "FullInterclasseSimulationTest será executado em sua fase isolada após os cenários gerais.\n";
+    }
+    $runScenario('CronogramaPlanejadoTest', static fn () => \SGITests\Integration\CronogramaPlanejadoTest::run());
+    }
 
 } catch (Throwable $e) {
     $aborted = true;
@@ -198,6 +246,36 @@ try {
 
 $tempoTotal = round(microtime(true) - $inicio, 2);
 $stats = Assertions::getStats();
+$suiteStatus = ($stats['failed'] > 0 || $aborted) ? 'failed' : 'passed';
+$testResultsDirectory = getenv('SGI_TEST_RESULTS_DIR');
+if ($testResultsDirectory !== false && trim($testResultsDirectory) !== '' && is_dir($testResultsDirectory) && is_writable($testResultsDirectory)) {
+    usort($scenarioDurations, static fn (array $a, array $b): int => $b['duration_seconds'] <=> $a['duration_seconds']);
+    $timingReport = [
+        'schema_version' => 1,
+        'suite' => 'integration',
+        'status' => $suiteStatus,
+        'aborted' => $aborted,
+        'started_at_utc' => $suiteStartedAtUtc,
+        'duration_seconds' => round((hrtime(true) - $suiteStartedAt) / 1_000_000_000, 3),
+        'assertions' => [
+            'total' => $stats['total'],
+            'failed' => $stats['failed'],
+        ],
+        'scenarios_slowest_first' => $scenarioDurations,
+    ];
+    try {
+        $timingFilename = $scenarioFilter === 'FullInterclasseSimulationTest'
+            ? 'simulation-integration-timings.json'
+            : 'integration-timings.json';
+        $timingPath = rtrim($testResultsDirectory, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $timingFilename;
+        $written = @file_put_contents($timingPath, json_encode($timingReport, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL);
+        if ($written === false) {
+            fwrite(STDERR, "Não foi possível gravar o relatório de duração da integração em {$timingPath}.\n");
+        }
+    } catch (Throwable $exception) {
+        fwrite(STDERR, "Não foi possível gravar o relatório de duração da integração: {$exception->getMessage()}\n");
+    }
+}
 
 echo "\n\033[1;36m====================================================================\033[0m\n";
 echo "\033[1;36m                       RESULTADO DA EXECUÇÃO                         \033[0m\n";

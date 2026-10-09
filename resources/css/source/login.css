@@ -12,11 +12,39 @@ body > main {
   background-color: var(--bs-body-bg);
 }
 
+.sgi-skip-link {
+  position: fixed;
+  z-index: 1080;
+  inset-block-start: max(.5rem, env(safe-area-inset-top, 0px));
+  inset-inline-start: max(.5rem, env(safe-area-inset-left, 0px));
+  transform: translateY(calc(-100% - .75rem));
+  border: 2px solid #fff;
+  border-radius: .5rem;
+  padding: .75rem 1rem;
+  background: var(--bs-primary);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 .25rem .75rem rgba(0, 0, 0, .2);
+}
+
+.sgi-skip-link:focus-visible {
+  transform: translateY(0);
+  color: #fff;
+  outline: 3px solid var(--bs-warning);
+  outline-offset: 2px;
+}
+
 #msg_erro_mobile,
 #msg_erro_desktop {
   margin-top: 10px;
   font-size: 0.9rem;
   font-weight: 400;
+}
+
+#msg_erro_mobile:focus,
+#msg_erro_desktop:focus {
+  outline: none;
 }
 
 .login-mobile-layout {

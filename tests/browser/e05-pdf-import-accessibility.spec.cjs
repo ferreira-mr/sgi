@@ -123,10 +123,12 @@ async function openPdfFormOnTurmaAlunos(page, viewport = { width: 1440, height: 
     await page.goto('turmas/alunos?id=901&id_turma=902&id_categoria=903', { waitUntil: 'domcontentloaded' });
     if (viewport.width < 768) {
         await page.locator('#botaoPdfMob').click();
+        await expect(page.locator('#blocoPdfMob')).toHaveClass(/\bshow\b/);
         await expect(page.locator('#formPdfTurmaMob')).toBeVisible();
         return { input: '#pdfInputMob', filename: '#pdfNomeMob', form: '#formPdfTurmaMob', message: '#msgPdfMob', progress: '#progressMob', bar: '#progressBarMob', text: '#progressTextoMob', submit: '#formPdfTurmaMob button[type="submit"]', search: '#buscaAlunoMob' };
     }
     await page.locator('#botaoPdfDesk').click();
+    await expect(page.locator('#blocoPdfDesk')).toHaveClass(/\bshow\b/);
     await expect(page.locator('#formPdfTurmaDesk')).toBeVisible();
     return { input: '#pdfInputDesk', filename: '#pdfNomeDesk', form: '#formPdfTurmaDesk', message: '#msgPdfDesk', progress: '#progressDesk', bar: '#progressBarDesk', text: '#progressTextoDesk', submit: '#formPdfTurmaDesk button[type="submit"]', search: '#buscaAlunoDesk' };
 }
@@ -324,8 +326,9 @@ test.describe('E05 — importação PDF acessível e recuperável', () => {
         const uploadStarted = new Promise((resolve) => { signalUpload = resolve; });
         const counts = installApiFixtures(page, {
             upload: async (route) => {
+                const hold = new Promise((resolve) => { releaseUpload = resolve; });
                 signalUpload();
-                await new Promise((resolve) => { releaseUpload = resolve; });
+                await hold;
                 return route.fulfill({
                     status: 200,
                     contentType: 'application/json',

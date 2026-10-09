@@ -231,13 +231,22 @@ final class ConcurrentPontoFinalizationTest
     private static function waitForFile(string $path, array $worker, string $description): void
     {
         $deadline = microtime(true) + 5.0;
-        while (!is_file($path) && microtime(true) < $deadline) {
+        while (microtime(true) < $deadline) {
+            clearstatcache(true, $path);
+            if (is_file($path) && (int) @filesize($path) > 0) {
+                return;
+            }
             if (!proc_get_status($worker['process'])['running']) {
+                clearstatcache(true, $path);
+                if (is_file($path) && (int) @filesize($path) > 0) {
+                    return;
+                }
                 throw new RuntimeException('Worker encerrou antes do marcador: ' . $description . '.');
             }
             usleep(10000);
         }
-        if (!is_file($path)) {
+        clearstatcache(true, $path);
+        if (!is_file($path) || (int) @filesize($path) <= 0) {
             throw new RuntimeException('Worker não produziu o marcador: ' . $description . '.');
         }
     }
@@ -262,18 +271,18 @@ final class ConcurrentPontoFinalizationTest
             $workers[] = $annuller;
             self::releaseWorkers($annulBarrier);
             $validatedFile = $annulBarrier . DIRECTORY_SEPARATOR . 'validated';
-            $deadline = microtime(true) + 5.0;
-            while (!is_file($validatedFile) && microtime(true) < $deadline) {
-                $status = proc_get_status($annuller['process']);
-                if (!$status['running']) {
-                    throw new RuntimeException('A anulação encerrou antes de alcançar sua barreira.');
+            self::waitForFile($validatedFile, $annuller, 'validação da anulação');
+            $validated = null;
+            $decodeDeadline = microtime(true) + 2.0;
+            while (!is_array($validated) && microtime(true) < $decodeDeadline) {
+                clearstatcache(true, $validatedFile);
+                $decoded = json_decode((string) @file_get_contents($validatedFile), true);
+                if (is_array($decoded)) {
+                    $validated = $decoded;
+                    break;
                 }
                 usleep(10000);
             }
-            if (!is_file($validatedFile)) {
-                throw new RuntimeException('A anulação não anunciou o estado que validou antes da gravação.');
-            }
-            $validated = json_decode((string) file_get_contents($validatedFile), true);
             if (!is_array($validated)) {
                 throw new RuntimeException('A barreira de anulação informou estado inválido.');
             }
@@ -338,20 +347,17 @@ final class ConcurrentPontoFinalizationTest
         $worker = ['process' => $process, 'pipes' => $pipes, 'thread_id' => 0];
 
         $readyFile = $barrier . DIRECTORY_SEPARATOR . 'ready-' . $workerId;
-        $deadline = microtime(true) + 5.0;
-        while (!is_file($readyFile) && microtime(true) < $deadline) {
-            $status = proc_get_status($process);
-            if (!$status['running']) {
-                throw new RuntimeException('O worker ' . $workerId . ' encerrou antes da barreira.');
+        self::waitForFile($readyFile, $worker, 'conexão independente de ' . $workerId);
+        $threadId = 0;
+        $decodeDeadline = microtime(true) + 2.0;
+        while ($threadId <= 0 && microtime(true) < $decodeDeadline) {
+            clearstatcache(true, $readyFile);
+            $ready = json_decode((string) @file_get_contents($readyFile), true);
+            $threadId = is_array($ready) ? (int) ($ready['db_thread'] ?? 0) : 0;
+            if ($threadId <= 0) {
+                usleep(10000);
             }
-            usleep(10000);
         }
-        if (!is_file($readyFile)) {
-            self::stopWorker($worker);
-            throw new RuntimeException('O worker ' . $workerId . ' não anunciou a conexão independente.');
-        }
-        $ready = json_decode((string) file_get_contents($readyFile), true);
-        $threadId = (int) ($ready['db_thread'] ?? 0);
         if ($threadId <= 0) {
             self::stopWorker($worker);
             throw new RuntimeException('O worker ' . $workerId . ' não informou o ID da conexão MySQL.');

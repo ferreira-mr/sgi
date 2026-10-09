@@ -40,6 +40,17 @@ include SGI_ROOT . '/resources/views/components/aluno-header.php';
         <div id="inscricoesAtuais"></div>
     </section>
 
+    <section class="mb-4 d-none" id="agendaInscricaoPreview" aria-live="polite">
+        <div class="d-flex align-items-center gap-3 mb-3">
+            <span class="bg-primary-subtle text-primary rounded-3 p-2 d-inline-flex fs-5"><i class="bi bi-calendar2-week-fill"></i></span>
+            <div>
+                <h2 class="h5 fw-bold mb-1">Agenda das modalidades selecionadas</h2>
+                <p class="small text-body-secondary mb-0">Confira os dias e horários previstos antes de salvar sua inscrição.</p>
+            </div>
+        </div>
+        <div id="agendaInscricaoPreviewCorpo"></div>
+    </section>
+
     <section class="mb-4" id="secaoDisponiveis">
         <div class="d-flex align-items-center gap-3 mb-3">
             <span class="bg-primary-subtle text-primary rounded-3 p-2 d-inline-flex fs-5"><i class="bi bi-grid-1x2-fill"></i></span>
@@ -74,11 +85,11 @@ include SGI_ROOT . '/resources/views/components/aluno-header.php';
                         <span id="progressCount" class="fw-semibold">0 de 3</span>
                     </div>
                     <div class="progress" role="progressbar" aria-label="Modalidades selecionadas" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0">
-                        <div id="progressBar" class="progress-bar" style="width: 0%"></div>
+                        <div id="progressBar" class="progress-bar"></div>
                     </div>
                 </div>
                 <div class="col-auto">
-                    <button type="button" class="btn btn-primary px-4 py-2" id="btnSalvar" onclick="salvarEscolhas()" disabled>
+                    <button type="button" class="btn btn-primary px-4 py-2" id="btnSalvar" disabled>
                         <i class="bi bi-check-lg"></i> Salvar
                     </button>
                 </div>
@@ -129,8 +140,6 @@ $paginaAtiva = 'inscricao';
 include SGI_ROOT . '/resources/views/components/aluno-nav.php';
 ?>
 
-<script type="application/json" data-sgi-config="aluno/modalidade"><?= json_encode(['value2' => ((string) ($genero_usuario)), 'value3' => ($categoria_usuario), 'value4' => ((int)($turma_usuario ?? 0)), 'value5' => ($modalidades_inscritas), 'value6' => ($id_usuario)], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR) ?></script>
+<script type="application/json" data-sgi-config="aluno/modalidade"><?= json_encode(['value2' => ((string) ($genero_usuario)), 'value3' => ($categoria_usuario), 'value4' => ((int)($turma_usuario ?? 0)), 'value5' => ($modalidades_inscritas), 'value6' => ($id_usuario), 'value7' => ($cronograma_versao ?? null), 'value8' => ($versao_publicada ?? null)], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR) ?></script>
 <script data-sgi-page src="<?= \App\Shared\Http\Assets::url('js/pages/aluno/modalidade.js') ?>"></script>
-<script src="<?= \App\Shared\Http\Assets::url('vendor/bootstrap/js/bootstrap.bundle.min.js') ?>" crossorigin="anonymous"></script>
-</body>
-</html>
+<?php include SGI_ROOT . '/resources/views/components/footer.php'; ?>

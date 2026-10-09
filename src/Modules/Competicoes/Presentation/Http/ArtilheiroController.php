@@ -52,7 +52,7 @@ final class ArtilheiroController
         }
         return Response::json([
             'success' => false,
-            'message' => 'O lançamento de gol foi substituído por um ponto vinculado a uma partida e a um atleta.',
+            'message' => 'O lançamento de gol foi substituído por um ponto vinculado a uma partida e a um estudante.',
         ], 422);
     }
 }

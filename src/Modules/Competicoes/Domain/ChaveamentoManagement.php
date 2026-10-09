@@ -14,6 +14,4 @@ interface ChaveamentoManagement
      * @return array<string, mixed>
      */
     public function saveIndividual(int $id, ?array $ranking, ?int $gameId = null): array;
-    /** @return array<string, mixed> */
-    public function createBracket(int $id): array;
 }

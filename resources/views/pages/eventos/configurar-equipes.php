@@ -36,7 +36,7 @@
             include SGI_ROOT . '/resources/views/components/page-header.php';
             unset($headerIdVoltar, $subtitulo, $headerAcoesHtml, $headerClasse);
             ?>
-            <span id="nomeInterclasseEquipes" class="visually-hidden" aria-hidden="true"></span>
+            <span id="nomeInterclasseEquipes" class="visually-hidden"></span>
 
             <div id="filtroCategoria" class="d-flex flex-wrap gap-2 mb-4"></div>
 

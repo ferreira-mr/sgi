@@ -1,18 +1,12 @@
-# syntax=docker/dockerfile:1.7
-
 FROM mcr.microsoft.com/playwright:v1.62.1-noble
 
 ENV CI=1
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-RUN npm ci --ignore-scripts
-
 COPY tests/browser/package.json tests/browser/package-lock.json tests/browser/
 RUN npm ci --prefix tests/browser
 
 COPY . .
-RUN npm run build
 
 COPY tools/docker-test-entrypoint.sh /usr/local/bin/docker-test-entrypoint
 RUN sed -i 's/\r$//' /usr/local/bin/docker-test-entrypoint \

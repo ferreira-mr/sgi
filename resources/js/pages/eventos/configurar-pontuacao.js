@@ -8,6 +8,7 @@ window.SGIPage.mount("eventos/configurar-pontuacao", function (pageConfig, pageS
     let VALORES_INICIAIS = {};
     let salvamentoEmAndamento = false;
     let destinoPendente = null;
+    let modalDirtyExibido = false;
 
     const modalDirty = document.getElementById('modalPontuacaoDirty');
 
@@ -186,9 +187,18 @@ window.SGIPage.mount("eventos/configurar-pontuacao", function (pageConfig, pageS
         return new Promise((resolve) => modalDirty.addEventListener('hidden.bs.modal', resolve, { once: true }));
     }
 
+    function aguardarExibicaoModal() {
+        if (!modalDirty || modalDirtyExibido) return Promise.resolve();
+        return new Promise((resolve) => modalDirty.addEventListener('shown.bs.modal', resolve, { once: true }));
+    }
+
     async function fecharModalENavegar(destino) {
         const destinoFinal = destino || destinoPendente;
         if (!destinoFinal) return;
+        // Bootstrap ignores hide() while the opening transition is in progress.
+        // Wait for shown so an immediate “Discard and continue” click cannot
+        // strand the user on the unsaved form.
+        await aguardarExibicaoModal();
         const fechado = aguardarFechamentoModal();
         window.bootstrap.Modal.getOrCreateInstance(modalDirty).hide();
         await fechado;
@@ -199,6 +209,16 @@ window.SGIPage.mount("eventos/configurar-pontuacao", function (pageConfig, pageS
         const destino = destinoPendente;
         destinoPendente = null;
         await fecharModalENavegar(destino);
+    }
+
+    async function cancelarNavegacao(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        destinoPendente = null;
+        await aguardarExibicaoModal();
+        const fechado = aguardarFechamentoModal();
+        window.bootstrap.Modal.getOrCreateInstance(modalDirty).hide();
+        await fechado;
     }
 
     async function salvarENavegar() {
@@ -232,6 +252,9 @@ window.SGIPage.mount("eventos/configurar-pontuacao", function (pageConfig, pageS
             pageScope.listen(input, 'change', () => window.validarPontos(input.id));
         });
 
+        const btnRestaurar = document.getElementById('btnRestaurarPadrao');
+        if (btnRestaurar) pageScope.listen(btnRestaurar, 'click', () => window.restaurarPadrao());
+
         const btnSalvar = document.getElementById('btnSalvarPontuacao');
         if (btnSalvar) pageScope.listen(btnSalvar, 'click', (event) => {
             event.preventDefault();
@@ -248,8 +271,14 @@ window.SGIPage.mount("eventos/configurar-pontuacao", function (pageConfig, pageS
         const salvarESair = document.getElementById('btnSalvarEContinuarPontuacao');
         if (descartar) pageScope.listen(descartar, 'click', () => { void descartarENavegar(); });
         if (salvarESair) pageScope.listen(salvarESair, 'click', () => { void salvarENavegar(); });
-        if (cancelar) pageScope.listen(cancelar, 'click', () => { destinoPendente = null; });
-        if (modalDirty) pageScope.listen(modalDirty, 'hidden.bs.modal', () => { destinoPendente = null; });
+        if (cancelar) pageScope.listen(cancelar, 'click', cancelarNavegacao);
+        if (modalDirty) {
+            pageScope.listen(modalDirty, 'shown.bs.modal', () => { modalDirtyExibido = true; });
+            pageScope.listen(modalDirty, 'hidden.bs.modal', () => {
+                modalDirtyExibido = false;
+                destinoPendente = null;
+            });
+        }
     });
 
     window.SGIPage.ready(async () => {

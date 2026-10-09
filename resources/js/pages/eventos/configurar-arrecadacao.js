@@ -13,6 +13,7 @@ window.SGIPage.mount("eventos/configurar-arrecadacao", function (pageConfig, pag
     }
 
     const storagePrefix = 'sgi_items_';
+    const mutationStoragePrefix = 'sgi_arrecadacao_mutation_';
     const paramsArrecadacao = new URLSearchParams(window.location.search);
     const idInterclasseArrecadacao = paramsArrecadacao.get('id');
     const isAdminPage = pageConfig.value2;
@@ -28,6 +29,37 @@ window.SGIPage.mount("eventos/configurar-arrecadacao", function (pageConfig, pag
 
     function salvarLocal(idTurma, valor) {
         localStorage.setItem(`${storagePrefix}${idTurma}`, String(valor));
+    }
+
+    function mutationStorageKey(idTurma, idInterclasse) {
+        return `${mutationStoragePrefix}${Number(window.SGI_SESSION_ID || 0)}_${Number(idInterclasse)}_${Number(idTurma)}`;
+    }
+
+    function mutationIdPara(payload) {
+        const idTurma = Number(payload.arrecadacoes[0].id_turma);
+        const key = mutationStorageKey(idTurma, payload.id_interclasse);
+        const fingerprint = JSON.stringify(payload);
+        try {
+            const saved = JSON.parse(sessionStorage.getItem(key) || 'null');
+            if (saved && saved.fingerprint === fingerprint && typeof saved.id === 'string' && saved.id !== '') {
+                return saved.id;
+            }
+        } catch (_) {}
+
+        const randomId = window.crypto && typeof window.crypto.randomUUID === 'function'
+            ? window.crypto.randomUUID()
+            : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+        const id = `arrecadacao-${randomId}`;
+        try {
+            sessionStorage.setItem(key, JSON.stringify({ fingerprint, id }));
+        } catch (_) {}
+        return id;
+    }
+
+    function limparMutationId(idTurma, idInterclasse) {
+        try {
+            sessionStorage.removeItem(mutationStorageKey(idTurma, idInterclasse));
+        } catch (_) {}
     }
 
     async function lerRespostaJson(response, descricao) {
@@ -171,9 +203,6 @@ window.SGIPage.mount("eventos/configurar-arrecadacao", function (pageConfig, pag
     pageScope.listen(window, 'beforeunload', () => {
         const pendentes = todasAsTurmas.some(t => getQuantidadePendente(t) > 0);
         if (pendentes) {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', `${API_BASE}/arrecadacao`, false);
-            xhr.setRequestHeader('Content-Type', 'application/json');
             const payload = {
                 id_interclasse: idInterclasseResolvida || idInterclasseArrecadacao,
                 arrecadacoes: todasAsTurmas.map(t => ({
@@ -181,7 +210,19 @@ window.SGIPage.mount("eventos/configurar-arrecadacao", function (pageConfig, pag
                     quantidade: getQuantidadePendente(t)
                 })).filter((item) => item.quantidade > 0)
             };
-            xhr.send(JSON.stringify(payload));
+            const body = JSON.stringify(payload);
+            try {
+                fetch(`${API_BASE}/arrecadacao`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body,
+                    keepalive: true
+                }).catch(() => {});
+            } catch (_) {
+                if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+                    navigator.sendBeacon(`${API_BASE}/arrecadacao`, new Blob([body], { type: 'application/json' }));
+                }
+            }
         }
     });
 
@@ -249,11 +290,15 @@ window.SGIPage.mount("eventos/configurar-arrecadacao", function (pageConfig, pag
             id_interclasse: idInterclasseResolvida || idInterclasseArrecadacao,
             arrecadacoes: [{ id_turma: Number(idTurma), quantidade }]
         };
+        const mutationId = mutationIdPara(payload);
 
         try {
             const response = await fetch(`${API_BASE}/arrecadacao`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-SGI-Mutation-Id': mutationId
+                },
                 body: JSON.stringify(payload)
             });
 
@@ -264,6 +309,7 @@ window.SGIPage.mount("eventos/configurar-arrecadacao", function (pageConfig, pag
             const result = await lerRespostaJson(response, 'Salvamento da arrecadação');
 
             if (result && result.success === true) {
+                limparMutationId(idTurma, payload.id_interclasse);
                 localStorage.removeItem(`${storagePrefix}${idTurma}`);
                 document.querySelectorAll(`.arrec-input[data-id-turma="${idTurma}"]`).forEach(inp => {
                     inp.value = '0';

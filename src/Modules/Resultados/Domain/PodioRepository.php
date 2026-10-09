@@ -29,6 +29,11 @@ interface PodioRepository
     /** @return array<string, mixed> */
     public function diagnosticar(): array;
 
+    /** @return array<int, int> */
+    public function pontosPadraoEdicao(int $editionId): array;
+
+    /** @return list<array<string, mixed>> */
+    public function carregarPodioModalidade(int $editionId, int $modalityId): array;
 
     public function invalidarFontesSemOrigemAtual(int $interclasseId, int $modalidadeId): void;
 }

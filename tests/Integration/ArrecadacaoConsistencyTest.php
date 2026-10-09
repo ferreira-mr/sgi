@@ -43,6 +43,39 @@ final class ArrecadacaoConsistencyTest
 
             self::setEditionValue($connection, $interclasseId, 2);
             self::setTurma($connection, $turmaId, '0', 30);
+            $mutationId = 'arrec-consistency-' . bin2hex(random_bytes(6));
+            $payload = [
+                'id_interclasse' => $interclasseId,
+                'arrecadacoes' => [['id_turma' => $turmaId, 'quantidade' => 10]],
+            ];
+            $historyBeforeReplay = self::historyCountForClass($connection, $interclasseId, $turmaId);
+            $firstCredit = $admin->postJson('api/v1/arrecadacao', $payload, ['X-SGI-Mutation-Id' => $mutationId]);
+            Assertions::assertJsonSuccess('Crédito com identidade de mutação é aceito', $firstCredit);
+            $creditAfterFirst = self::turma($connection, $turmaId);
+            Assertions::assert('Primeiro crédito altera quantidade e pontuação uma vez', $creditAfterFirst['quantidade'] === '10.00' && $creditAfterFirst['pontos'] === 50);
+
+            $replayedCredit = $admin->postJson('api/v1/arrecadacao', $payload, ['X-SGI-Mutation-Id' => $mutationId]);
+            Assertions::assertStatus('Replay de crédito devolve a resposta original', $replayedCredit, (int) $firstCredit['code']);
+            Assertions::assert('Replay de crédito devolve o mesmo corpo confirmado', $replayedCredit['json'] === $firstCredit['json']);
+            Assertions::assert('Replay de crédito não duplica histórico nem pontos', self::turma($connection, $turmaId) === $creditAfterFirst && self::historyCountForClass($connection, $interclasseId, $turmaId) === $historyBeforeReplay + 1);
+
+            $changedCredit = $payload;
+            $changedCredit['arrecadacoes'][0]['quantidade'] = 11;
+            $conflictingCredit = $admin->postJson('api/v1/arrecadacao', $changedCredit, ['X-SGI-Mutation-Id' => $mutationId]);
+            Assertions::assertStatus('A mesma identidade não pode representar outro crédito', $conflictingCredit, 409);
+            Assertions::assert('Conflito de fingerprint não altera quantidade, pontos ou histórico', self::turma($connection, $turmaId) === $creditAfterFirst && self::historyCountForClass($connection, $interclasseId, $turmaId) === $historyBeforeReplay + 1);
+
+            $creditHistoryId = self::latestHistoryId($connection, $interclasseId, $turmaId);
+            $deleteMutationId = 'arrec-delete-' . bin2hex(random_bytes(6));
+            $deletePayload = ['id_historico' => $creditHistoryId, 'id_interclasse' => $interclasseId];
+            $firstCreditReversal = $admin->deleteJson('api/v1/arrecadacao', $deletePayload, ['X-SGI-Mutation-Id' => $deleteMutationId]);
+            Assertions::assertJsonSuccess('Estorno com identidade de mutação é aceito', $firstCreditReversal);
+            $replayedCreditReversal = $admin->deleteJson('api/v1/arrecadacao', $deletePayload, ['X-SGI-Mutation-Id' => $deleteMutationId]);
+            Assertions::assertStatus('Replay de estorno devolve a resposta original', $replayedCreditReversal, (int) $firstCreditReversal['code']);
+            Assertions::assert('Replay de estorno não aplica o desconto duas vezes', self::turma($connection, $turmaId) === ['quantidade' => '0.00', 'pontos' => 30]);
+
+            self::setEditionValue($connection, $interclasseId, 2);
+            self::setTurma($connection, $turmaId, '0', 30);
             $batch = $admin->postJson('api/v1/arrecadacao', [
                 'id_interclasse' => $interclasseId,
                 'arrecadacoes' => [
@@ -216,6 +249,26 @@ final class ArrecadacaoConsistencyTest
         $count = (int) $statement->get_result()->fetch_column();
         $statement->close();
         return $count;
+    }
+
+    private static function historyCountForClass(\mysqli $connection, int $editionId, int $classId): int
+    {
+        $statement = $connection->prepare('SELECT COUNT(*) FROM historico_arrecadacoes WHERE id_interclasse = ? AND id_turma = ?');
+        $statement->bind_param('ii', $editionId, $classId);
+        $statement->execute();
+        $count = (int) $statement->get_result()->fetch_column();
+        $statement->close();
+        return $count;
+    }
+
+    private static function latestHistoryId(\mysqli $connection, int $editionId, int $classId): int
+    {
+        $statement = $connection->prepare('SELECT id_historico FROM historico_arrecadacoes WHERE id_interclasse = ? AND id_turma = ? ORDER BY id_historico DESC LIMIT 1');
+        $statement->bind_param('ii', $editionId, $classId);
+        $statement->execute();
+        $id = (int) $statement->get_result()->fetch_column();
+        $statement->close();
+        return $id;
     }
 
     private static function historyPoints(\mysqli $connection, int $historyId): int

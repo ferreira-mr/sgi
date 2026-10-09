@@ -53,7 +53,7 @@ final class ChaveamentoService
         }
         if ($individual) {
             if (!$rankingInformado && $ranking === null) {
-                return $this->repository->saveIndividual($id, null);
+                throw new ChaveamentoGenerationDisabledException();
             }
             if ($ranking === null) {
                 throw new InvalidArgumentException('É necessário informar o 1º, 2º e 3º lugar.');
@@ -67,8 +67,8 @@ final class ChaveamentoService
         }
         $modality = $this->repository->modality($id);
         if ($modality !== null && TipoCompeticaoRules::isIndividual($modality)) {
-            return $this->repository->saveIndividual($id, null);
+            throw new InvalidArgumentException('A prova individual deve ser preparada pelo calendário da edição.');
         }
-        return $this->repository->createBracket($id);
+        throw new ChaveamentoGenerationDisabledException();
     }
 }

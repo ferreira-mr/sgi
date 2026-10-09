@@ -137,10 +137,51 @@ final class MysqliLocalScheduleGuard
         $row = $statement->get_result()->fetch_assoc() ?: null;
         $statement->close();
         if ($row === null) {
-            return null;
+            return self::conflictWithPublishedPlan($connection, $date, $localId, $start, $end, $lockRows);
         }
 
         return 'Já existe uma reserva neste mesmo local com conflito de horário (' . (string) $row['chave_tag'] . ').';
+    }
+
+    private static function conflictWithPublishedPlan(
+        mysqli $connection,
+        string $date,
+        int $localId,
+        string $start,
+        string $end,
+        bool $lockRows,
+    ): ?string {
+        $table = $connection->query("SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'cronograma_compromissos' LIMIT 1");
+        if ($table === false || $table->num_rows === 0) {
+            if ($table !== false) {
+                $table->free();
+            }
+            return null;
+        }
+        $table->free();
+        $sql = "SELECT cc.chave_tag FROM cronograma_compromissos cc
+                INNER JOIN interclasse_planejamentos ip
+                    ON ip.id_interclasse = cc.id_interclasse
+                   AND ip.versao_publicada = cc.cronograma_versao
+                   AND ip.cronograma_status = 'publicado'
+                WHERE cc.data_compromisso = ? AND cc.id_local = ?
+                  AND ? < ADDTIME(cc.termino_compromisso, '00:10:00')
+                  AND ADDTIME(?, '00:10:00') > cc.inicio_compromisso
+                LIMIT 1" . ($lockRows ? ' FOR UPDATE' : '');
+        $statement = $connection->prepare($sql);
+        if ($statement === false) {
+            throw new RuntimeException('Não foi possível validar conflitos do cronograma publicado.');
+        }
+        $statement->bind_param('siss', $date, $localId, $start, $end);
+        if (!$statement->execute()) {
+            $statement->close();
+            throw new RuntimeException('Não foi possível validar conflitos do cronograma publicado.');
+        }
+        $row = $statement->get_result()->fetch_assoc() ?: null;
+        $statement->close();
+        return $row === null
+            ? null
+            : 'Já existe um compromisso publicado neste mesmo local com conflito de horário (' . (string) $row['chave_tag'] . ').';
     }
 
     /** @param list<int> $excludedGameIds */

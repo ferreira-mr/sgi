@@ -10,7 +10,6 @@ $paginaAtiva = 'chaveamento';
 $nivelUsuario = (int)($_SESSION['nivel'] ?? -1);
 $isNivel3 = $nivelUsuario === 3;
 $isNivel2 = $nivelUsuario === 2;
-$podeGerar = !$isNivel2 && !$isNivel3;
 $podeEditar = !$isNivel2 && !$isNivel3;
 ?>
 
@@ -56,19 +55,14 @@ $podeEditar = !$isNivel2 && !$isNivel3;
 
     <div class="card border-0 shadow-sm rounded-4 p-4 mb-4">
         <div class="mb-3">
-            <div class="h5 fw-bold text-body mb-1"><i class="bi bi-diagram-3 me-2 text-primary" ></i><?php echo $podeGerar ? 'Gerar novo chaveamento' : 'Visualizar chaveamento'; ?></div>
-            <div class="small text-body-secondary"><?php echo $podeGerar ? 'Selecione uma modalidade para gerar automaticamente o chaveamento.' : 'Selecione uma modalidade para visualizar a árvore do torneio.'; ?></div>
+            <div class="h5 fw-bold text-body mb-1"><i class="bi bi-diagram-3 me-2 text-primary" ></i>Chaveamento da competição</div>
+            <div class="small text-body-secondary">A árvore e os horários vêm do cronograma publicado da edição.</div>
         </div>
         <div class="d-flex flex-column gap-2">
             <div id="kvs-wrap-selectModalidadeMob" class="kvs-wrap w-100 sgi-u-min-width-0" ></div>
             <select class="form-select d-none" id="selectModalidadeMob">
                 <option value="">Selecione uma modalidade</option>
             </select>
-            <?php if ($podeGerar): ?>
-            <button class="btn btn-primary d-inline-flex align-items-center gap-2" id="btnGerarChaveamentoMob">
-                <i class="bi bi-diagram-3-fill"></i> Gerar
-            </button>
-            <?php endif; ?>
         </div>
         <div id="msgChaveamentoMob" class="alert d-none" ></div>
     </div>
@@ -76,7 +70,7 @@ $podeEditar = !$isNivel2 && !$isNivel3;
     <div id="bracketAreaMob" class="card border-0 shadow-sm rounded-4 text-center sgi-u-min-width-0 p-5">
         <div class="display-5 text-body-tertiary mb-3"><i class="bi bi-diagram-3"></i></div>
         <div class="h5 fw-bold text-body mb-2">Nenhum chaveamento disponível</div>
-        <div class="small text-body-secondary">Selecione uma modalidade acima para <?php echo $podeGerar ? 'gerar ou ' : ''; ?>visualizar um chaveamento.</div>
+        <div class="small text-body-secondary">Selecione uma modalidade para consultar a árvore criada pelo cronograma publicado.</div>
     </div>
 
     <div id="secaoJogosMob" class="mt-4 sgi-u-min-width-0">
@@ -102,7 +96,7 @@ $podeEditar = !$isNivel2 && !$isNivel3;
                             <th id="jogos-mob-th-partida" scope="col">Partida</th>
                             <th id="jogos-mob-th-modalidade" scope="col">Modalidade</th>
                             <th id="jogos-mob-th-data" scope="col">Data</th>
-                            <th id="jogos-mob-th-tempo" scope="col">Tempo</th>
+                            <th id="jogos-mob-th-tempo" scope="col">Duração do jogo</th>
                             <th id="jogos-mob-th-acrescimos" scope="col">Acréscimos</th>
                             <th id="jogos-mob-th-destaque" scope="col">Artilheiro/Destaque</th>
                             <th id="jogos-mob-th-status" scope="col">Status</th>
@@ -127,11 +121,7 @@ $podeEditar = !$isNivel2 && !$isNivel3;
         <?php
         $headerIdVoltar = 'btnVoltar';
         $headerCorpoHtml = '<h1 class="h2 fw-bold text-body mb-0">Chaveamento</h1>';
-        $headerAcoesHtml = '<div class="d-flex gap-2 align-items-center flex-wrap">
-                ' . ($podeGerar ? '<button class="btn btn-primary d-inline-flex align-items-center gap-2" id="btnGerarChaveamento">
-                    <i class="bi bi-diagram-3-fill"></i> Gerar Chaveamento
-                </button>' : '') . '
-            </div>';
+        $headerAcoesHtml = '';
         include SGI_ROOT . '/resources/views/components/page-header.php';
         unset($headerMostrarVoltar, $headerCorpoHtml, $headerAcoesHtml, $headerClasse, $headerUrlVoltar, $headerIdVoltar, $headerClassBotao, $headerHiddenBotao);
         ?>
@@ -177,8 +167,8 @@ $podeEditar = !$isNivel2 && !$isNivel3;
 
         <div class="card border-0 shadow-sm rounded-4 p-4 mb-4">
             <div class="mb-3">
-                <div class="h5 fw-bold text-body mb-1"><i class="bi bi-diagram-3 me-2 text-primary" ></i><?php echo $podeGerar ? 'Gerar novo chaveamento' : 'Visualizar chaveamento'; ?></div>
-                <div class="small text-body-secondary"><?php echo $podeGerar ? 'Selecione uma modalidade para gerar automaticamente o chaveamento.' : 'Selecione uma modalidade para visualizar a árvore do torneio.'; ?></div>
+                <div class="h5 fw-bold text-body mb-1"><i class="bi bi-diagram-3 me-2 text-primary" ></i>Chaveamento da competição</div>
+                <div class="small text-body-secondary">A árvore e os horários vêm do cronograma publicado da edição.</div>
             </div>
             <div class="d-flex flex-column flex-lg-row gap-2 align-items-stretch">
                 <div id="kvs-wrap-selectModalidade" class="kvs-wrap"></div>
@@ -186,9 +176,6 @@ $podeEditar = !$isNivel2 && !$isNivel3;
                     <option value="">Selecione uma modalidade</option>
                 </select>
             </div>
-            <?php if ($podeGerar): ?>
-            <div class="small text-body-secondary mt-3 fst-italic">⚠ Não há possibilidade de gerar um segundo chaveamento.Tome cuidado!</div>
-            <?php endif; ?>
             <div id="msgChaveamento"></div>
             <div id="linkVerArvore" class="d-none mt-2" >
                 <a href="#" id="btnVerArvore" class="btn btn-outline-secondary d-inline-flex align-items-center gap-2">
@@ -203,12 +190,7 @@ $podeEditar = !$isNivel2 && !$isNivel3;
             <div class="card border-0 shadow-sm rounded-4 text-center p-5">
                 <div class="display-5 text-body-tertiary mb-3"><i class="bi bi-diagram-3"></i></div>
                 <div class="h5 fw-bold text-body mb-2">Nenhum chaveamento disponível</div>
-                <div class="small text-body-secondary mb-4">Selecione uma modalidade acima para <?php echo $podeGerar ? 'gerar ou ' : ''; ?>visualizar um chaveamento.</div>
-                <?php if ($podeGerar): ?>
-                <button class="btn btn-primary d-inline-flex align-items-center gap-2" onclick="kvs_focus('selectModalidade');">
-                    <i class="bi bi-diagram-3-fill"></i> Gerar Chaveamento
-                </button>
-                <?php endif; ?>
+                <div class="small text-body-secondary mb-4">Selecione uma modalidade para consultar a árvore criada pelo cronograma publicado.</div>
             </div>
         </div>
 
@@ -235,7 +217,7 @@ $podeEditar = !$isNivel2 && !$isNivel3;
                                 <th id="jogos-th-partida" scope="col">Partida</th>
                                 <th id="jogos-th-modalidade" scope="col">Modalidade</th>
                                 <th id="jogos-th-data" scope="col">Data</th>
-                                <th id="jogos-th-tempo" scope="col">Tempo</th>
+                                <th id="jogos-th-tempo" scope="col">Duração do jogo</th>
                                 <th id="jogos-th-acrescimos" scope="col">Acréscimos</th>
                                 <th id="jogos-th-destaque" scope="col">Artilheiro/Destaque</th>
                                 <th id="jogos-th-status" scope="col">Status</th>
@@ -264,7 +246,7 @@ $podeEditar = !$isNivel2 && !$isNivel3;
                 <h5 class="modal-title fw-bold text-body d-flex align-items-center gap-2" id="tituloModalEditarJogo"><i class="bi bi-pencil-square text-danger" aria-hidden="true"></i> Editar Jogo</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
-            <form id="formEditarJogo" onsubmit="return salvarEdicaoJogo(event)">
+            <form id="formEditarJogo">
                 <div class="modal-body px-4">
                     <input type="hidden" id="editIdJogo">
                     <div class="bg-body-tertiary border rounded-3 p-3 mb-4" id="editResumoPartida">
@@ -332,7 +314,7 @@ $podeEditar = !$isNivel2 && !$isNivel3;
     </div>
 </div>
 
-<script type="application/json" data-sgi-config="competicoes/chaveamento"><?= json_encode(['value0' => ($podeGerar), 'value3' => ($nivelUsuario), 'podeEditar' => ($podeEditar)], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR) ?></script>
+<script type="application/json" data-sgi-config="competicoes/chaveamento"><?= json_encode(['value3' => ($nivelUsuario), 'podeEditar' => ($podeEditar)], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR) ?></script>
 <script data-sgi-page src="<?= \App\Shared\Http\Assets::url('js/pages/competicoes/chaveamento.js') ?>"></script>
 
 <?php

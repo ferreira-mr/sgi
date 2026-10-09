@@ -10,7 +10,13 @@ x-test-environment: &test-environment
   SGI_DB_PASSWORD: ${SGI_DB_PASSWORD:-sgi-test-only}
   SGI_TEST_DB_NAME: ${SGI_TEST_DB_NAME:-sgi_test}
   SGI_TEST_DB_RUNTIME: container
+  SGI_TEST_RESULTS_DIR: /app/test-results
   SGI_TEST_RUN_ID: ${SGI_TEST_RUN_ID:-compose}
+  SGI_TEST_INTEGRATION_SCENARIO: ${SGI_TEST_INTEGRATION_SCENARIO:-}
+  SGI_TEST_DEFER_SIMULATION: ${SGI_TEST_DEFER_SIMULATION:-0}
+  SGI_SIMULATION_PHASE: ${SGI_SIMULATION_PHASE:-complete}
+  SGI_SIMULATION_RUN_ID: ${SGI_SIMULATION_RUN_ID:-}
+  SGI_TEST_PRESERVE_DATABASE: ${SGI_TEST_PRESERVE_DATABASE:-0}
   SGI_E2E_RESET: "0"
   SGI_TEST_BASE_URL: http://sgi-web:8099
   SGI_BASE_URL: http://sgi-web:8099/
@@ -49,6 +55,7 @@ x-browser-test-service: &browser-test-service
     <<: *test-environment
     SGI_INDIVIDUAL_BROWSER: "1"
     SGI_BROWSER_REQUIRES_DATABASE: "1"
+    SGI_BROWSER_JSON_REPORT: ${SGI_BROWSER_JSON_REPORT:-/app/test-results/browser-playwright.json}
   volumes:
     - type: bind
       source: ${SGI_TEST_RESULTS_DIR:-./test-results}
@@ -131,7 +138,6 @@ services:
         set -e
         composer validate --no-check-publish
         composer verify
-        npm run build
         npm run check
         npm test
 
@@ -155,6 +161,32 @@ services:
       app:
         condition: service_healthy
     command: ["npm", "--prefix", "tests/browser", "test", "--", "--grep-invert", "contrato visual do acesso"]
+
+  browser-simulation:
+    <<: *browser-test-service
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      <<: *test-environment
+      SGI_INDIVIDUAL_BROWSER: "1"
+      SGI_BROWSER_REQUIRES_DATABASE: "1"
+      SGI_RUN_SIMULATION_PORTAL: "1"
+      SGI_BROWSER_JSON_REPORT: /app/test-results/simulation-browser-playwright.json
+    command: ["npm", "--prefix", "tests/browser", "test", "--", "--project=simulation", "--grep", "224 alunos autenticam"]
+
+  browser-simulation-events:
+    <<: *browser-test-service
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      <<: *test-environment
+      SGI_INDIVIDUAL_BROWSER: "1"
+      SGI_BROWSER_REQUIRES_DATABASE: "1"
+      SGI_RUN_SIMULATION_PORTAL: "1"
+      SGI_BROWSER_JSON_REPORT: /app/test-results/simulation-events-playwright.json
+    command: ["npm", "--prefix", "tests/browser", "test", "--", "--project=simulation", "--grep", "opera a edição preparada"]
 
   visual:
     <<: *browser-test-service

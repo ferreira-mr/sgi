@@ -459,12 +459,13 @@ test('searchable bracket control inherits the shared Bootstrap typography', () =
     assert.doesNotMatch(css, /\.kvs__(?:trigger|search|opcao)\s*\{[^}]*font-family\s*:/);
 });
 
-test('coarse-pointer devices fall back to the native bracket select', () => {
+test('native modality select still loads the published tree on touch devices', () => {
     const source = fs.readFileSync(path.join(root, 'resources', 'js', 'pages', 'competicoes', 'chaveamento.js'), 'utf8');
     const css = fs.readFileSync(path.join(root, 'resources', 'css', 'source', 'admin.css'), 'utf8');
     assert.match(source, /function usarSeletorNativo\(\)/);
     assert.match(source, /if \(!usarSeletorNativo\(\)\) \{\s*kvs_montar\(\{/);
-    assert.match(source, /selectMobEl\.value/);
+    assert.match(source, /if \(selectMob\) pageScope\.listen\(selectMob, 'change'/);
+    assert.match(source, /carregarArvore\(this\.value\)/);
     assert.match(source, /select\.showPicker/);
     assert.match(css, /@media \(pointer: coarse\), \(hover: none\) \{\s*\n\s*\.kvs-wrap \{ display: none; \}\s*\n\s*\.kvs-wrap\s*\+\s*select \{ display: block !important; \}/);
 });
@@ -739,4 +740,25 @@ test('shared data tables use native Bootstrap table classes', () => {
     assert.match(sources, /table table-hover align-middle/);
     assert.doesNotMatch(sources, /sgi-table/);
     assert.doesNotMatch(sources, /table\.sgi-table/);
+});
+
+test('agenda cronograma workflow uses visual stepper and contextual step cards', () => {
+    const view = fs.readFileSync(path.join(root, 'resources', 'views', 'pages', 'eventos', 'configurar-agenda.php'), 'utf8');
+    const js = fs.readFileSync(path.join(root, 'resources', 'js', 'pages', 'eventos', 'configurar-agenda.js'), 'utf8');
+    const css = fs.readFileSync(path.join(root, 'resources', 'css', 'source', 'admin.css'), 'utf8');
+
+    assert.match(view, /id="cronogramaStepper" class="sgi-stepper list-unstyled mb-0"/);
+    assert.equal((view.match(/data-sgi-step-indicator="[1-6]"/g) || []).length, 6);
+    assert.equal((view.match(/data-sgi-step-card="[1-6]"/g) || []).length, 6);
+    assert.match(view, /data-sgi-step-card="2"[\s\S]*id="cronogramaDataInicio"[\s\S]*id="cronogramaDuracao"[\s\S]*id="cronogramaGerar"/);
+    assert.match(view, /data-sgi-step-card="4"[\s\S]*id="cronogramaInscricaoInicio"[\s\S]*id="cronogramaInscricaoFim"[\s\S]*id="cronogramaAbrir"/);
+    assert.match(js, /calcularProgressoCronograma/);
+    assert.match(js, /atualizarStepperCronograma/);
+    assert.match(js, /sgi-stepper__item--completed/);
+    assert.match(js, /sgi-stepper__item--active/);
+    assert.match(js, /sgi-step-card--active/);
+    assert.match(js, /setAttribute\('aria-current', 'step'\)/);
+    assert.match(css, /\.sgi-stepper\b/);
+    assert.match(css, /\.sgi-stepper__item--active\b/);
+    assert.match(css, /\.sgi-step-card--active\b/);
 });

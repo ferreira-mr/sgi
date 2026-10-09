@@ -19,7 +19,7 @@ $paginaAtiva = 'categorias';
             <div class="input-group flex-grow-1">
                 <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
                 <label for="buscaTurmaMob" class="visually-hidden">Buscar turma</label>
-                <input type="text" class="form-control" id="buscaTurmaMob" placeholder="Buscar turma..." oninput="filtrarTurmas()">
+                <input type="text" class="form-control" id="buscaTurmaMob" placeholder="Buscar turma...">
             </div>
         </div>
         <div id="listaTurmasMobile"></div>
@@ -41,7 +41,7 @@ $paginaAtiva = 'categorias';
             <div class="input-group w-auto">
                 <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
                 <label for="buscaTurmaDesk" class="visually-hidden">Buscar turma</label>
-                <input type="text" class="form-control" id="buscaTurmaDesk" placeholder="Buscar turma..." oninput="filtrarTurmas()">
+                <input type="text" class="form-control" id="buscaTurmaDesk" placeholder="Buscar turma...">
             </div>
             ' . ($nivelUsuario === 0 ? '<button class="btn btn-primary d-inline-flex align-items-center gap-2 fw-bold px-3 py-2 border-0 rounded-3" data-bs-toggle="modal" data-bs-target="#exampleModal">
                 <i class="bi bi-plus-lg" aria-hidden="true"></i> Nova Turma
@@ -87,11 +87,11 @@ $paginaAtiva = 'categorias';
                         </select>
                     </div>
                     <div class="mb-3 d-flex align-items-center gap-2 flex-column">
-                        <input type="file" id="arquivoUpload" class="d-none" accept=".pdf" onchange="mostrarNomeArquivo()">
-                        <p class="small">Adicione aqui o pdf dos alunos da turma criada</p>
+                        <input type="file" id="arquivoUpload" class="d-none" accept=".pdf">
+                        <p class="small">Adicione aqui o PDF dos estudantes da turma criada</p>
 
                         <label for="arquivoUpload" class="btn btn-outline-primary">
-                            <i class="bi bi-upload" aria-hidden="true"></i> Selecionar PDF dos alunos
+                            <i class="bi bi-upload" aria-hidden="true"></i> Selecionar PDF dos estudantes
                         </label>
 
                         <span id="nomeArquivo" class="text-muted"></span>

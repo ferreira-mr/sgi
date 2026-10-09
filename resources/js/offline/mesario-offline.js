@@ -74,7 +74,8 @@
         retryTimer: null,
         retryAttempts: 0,
         retryPendente: false,
-        ultimaFalha: null
+        ultimaFalha: null,
+        cronogramaObsoleto: false
     };
 
     /* ============================ Util ============================ */
@@ -426,14 +427,19 @@
             if (t.indexOf('__SGI_OFFLINE_FORM__') > -1) return;
         });
 
-        // Perifericos fora do <main>: FAB e modais (ex.: jogos)
+        // Periféricos fora do <main>: FAB e modais (ex.: jogos). Copiamos
+        // somente a raiz de cada periférico: os campos internos de um modal
+        // também podem ter "modal" no id e, se forem copiados isoladamente,
+        // escapam do overlay e aparecem no rodapé da tela.
         var vistos = {};
-        doc.body.querySelectorAll('[data-bs-toggle="modal"],[data-bs-target],[id*="modal" i],[class*="fab"]').forEach(function (el) {
+        var seletorPerifericos = '[data-bs-toggle="modal"],[data-bs-target],[id*="modal" i],[class*="fab"]';
+        doc.body.querySelectorAll(seletorPerifericos).forEach(function (el) {
             // A navegação compacta já pertence à casca inicial. Não a copie
             // para cada tela, pois isso criaria dois gatilhos/offcanvas após
             // uma troca de rota na SPA.
             if (el.matches('.sgi-mobile-menu-trigger, .sgi-mobile-menu') || el.closest('.sgi-mobile-menu')) return;
             if (el.closest('main')) return;
+            if (el.parentElement && el.parentElement.closest(seletorPerifericos)) return;
             var tag = el.tagName;
             if (tag === 'NAV' || tag === 'FOOTER' || tag === 'SCRIPT' || tag === 'STYLE') return;
             var id = el.id || el.className || '';
@@ -489,7 +495,17 @@
             if (rec && isLoginHtml(rec.html)) {
                 return idbRemove(key).then(function () { return null; });
             }
-            if (rec) return rec;
+            // A navegação do mesário não depende de recarregar o documento:
+            // quando há conexão, atualiza a tela e seus dados no servidor
+            // antes de reutilizar a cópia preparada para offline. Se a rede
+            // falhar, a cópia anterior continua disponível sem interromper a
+            // operação em andamento.
+            if (rec) {
+                if (navigator.onLine !== false) {
+                    return baixarTela(tela, params).catch(function () { return rec; });
+                }
+                return rec;
+            }
             function alternativaOuErro() {
                 return idbFindTela(tela, params).then(function (alternativa) {
                     if (alternativa && isLoginHtml(alternativa.html)) {
@@ -601,7 +617,15 @@
         var key = chaveTela(tela, params);
 
         if (state.montadas[key]) {
-            ativarMontagem(key, tela, params);
+            if (tela !== 'dashboard' && navigator.onLine !== false) {
+                obterRegistro(tela, params).then(function (rec) {
+                    montarTela(key, rec, tela, params);
+                }).catch(function () {
+                    ativarMontagem(key, tela, params);
+                });
+            } else {
+                ativarMontagem(key, tela, params);
+            }
             return;
         }
 
@@ -667,10 +691,11 @@
         ativarMontagem(key, tela, params, true);
     }
 
-    /* Botão "Voltar" da casca do mesário: fica oculto apenas na dashboard
-       (raiz da casca). Os destinos são links reais para o painel; a
-       intercepção da SPA converte a navegação em troca de tela sem
-       recarregar a página. */
+    /* O cabeçalho da casca pertence somente à dashboard. As telas filhas,
+       como Agenda, possuem cabeçalho e retorno próprios; assim a SPA não
+       exibe dois títulos ou dois botões de voltar. Os destinos são links
+       reais para o painel e a intercepção converte a navegação em troca de
+       tela sem recarregar a página. */
     function atualizarVoltarMesario(tela) {
         var esconder = tela === 'dashboard';
         ['sgiBtnVoltarMesario', 'sgiBtnVoltarMesarioDesk'].forEach(function (id) {
@@ -681,6 +706,17 @@
                 el.setAttribute('aria-hidden', 'true');
             } else {
                 el.removeAttribute('aria-hidden');
+            }
+        });
+
+        document.querySelectorAll('.sgi-mesario-topbar').forEach(function (topbar) {
+            var mostrar = tela === 'dashboard';
+            topbar.classList.toggle('sgi-mesario-topbar--oculta', !mostrar);
+            topbar.hidden = !mostrar;
+            if (mostrar) {
+                topbar.removeAttribute('aria-hidden');
+            } else {
+                topbar.setAttribute('aria-hidden', 'true');
             }
         });
     }
@@ -768,6 +804,10 @@
             b + 'turmas?id_interclasse=' + id,
             b + 'equipes',
             b + 'equipes?id_interclasse=' + id,
+            // A preparação offline precisa carregar a revisão publicada e o
+            // estado de liberação para detectar uma revisão do evento ao
+            // reconectar, sem descartar a fila de resultados.
+            b + 'cronograma?id_interclasse=' + id,
             b + 'agenda-blocos?id_interclasse=' + id,
             b + 'jogos?id_interclasse=' + id,
             b + 'jogos?x=1&id_interclasse=' + id
@@ -1080,6 +1120,7 @@
         ocultarProgresso();
         if (ok) {
             state.pronto = true;
+            state.cronogramaObsoleto = false;
             marcarPronto();
             mostrarBadge();
             aviso('Tudo pronto! Páginas e dados sincronizados. Você já pode usar offline. 🟢');
@@ -1221,7 +1262,7 @@
         // as telas e partidas terminarem de ser baixadas.
         var banner = document.getElementById('sgi-offline-banner');
         var bannerVisivel = banner && !banner.classList.contains('d-none') && !banner.classList.contains('sgi-hidden');
-        if (b) { b.style.display = state.preloading || bannerVisivel ? 'none' : 'inline-flex'; }
+        if (b) { b.style.display = state.preloading || bannerVisivel || state.cronogramaObsoleto ? 'none' : 'inline-flex'; }
     }
 
     function observarEstadoBanner() {
@@ -1261,6 +1302,11 @@
         }
 
         criarUi();
+        window.addEventListener('sgi:cronograma-revisado', function () {
+            state.cronogramaObsoleto = true;
+            ocultarBadge();
+            aviso('O cronograma foi revisado. Atualize a preparação antes de continuar; a fila de resultados foi preservada.');
+        });
         observarEstadoBanner();
         registrarInterceptacao();
         atualizarVoltarMesario('dashboard');

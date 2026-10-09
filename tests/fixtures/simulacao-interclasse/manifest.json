@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "scenario": "sgi-full-interclasse",
+  "seed": "sesi-interclasse-2026-v1",
+  "timezone": "America/Sao_Paulo",
+  "students_per_class": 32,
+  "required_classes": ["6EF", "7EF", "8EF", "9EF", "1EMA", "2EMA", "3EMA"],
+  "classes": [
+    { "alias": "6EF", "category": "I" },
+    { "alias": "7EF", "category": "I" },
+    { "alias": "8EF", "category": "I" },
+    { "alias": "9EF", "category": "II" },
+    { "alias": "1EMA", "category": "II" },
+    { "alias": "2EMA", "category": "II" },
+    { "alias": "3EMA", "category": "II" }
+  ],
+  "gender_ranges": {
+    "MASC": [1, 16],
+    "FEM": [17, 32]
+  },
+  "modalities": [
+    { "alias": "FUTSAL", "name": "Futsal - MA", "gender": "MASC", "min_team_size": 5, "max_team_size": 10, "student_ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] },
+    { "alias": "QUEIMADA", "name": "Queimada - MI", "gender": "MISTO", "min_team_size": 10, "max_team_size": 20, "student_ids": [1, 2, 3, 4, 5, 6, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24] },
+    { "alias": "VOLEI", "name": "Volei - MI", "gender": "MISTO", "min_team_size": 6, "max_team_size": 12, "student_ids": [7, 8, 9, 10, 25, 26, 27, 28, 29, 30, 31, 32] },
+    { "alias": "CORRIDA_MASC", "name": "Corrida - MA", "gender": "MASC", "min_team_size": 2, "max_team_size": 2, "student_ids": [1, 2] },
+    { "alias": "CORRIDA_FEM", "name": "Corrida - FE", "gender": "FEM", "min_team_size": 2, "max_team_size": 2, "student_ids": [17, 18] }
+  ],
+  "expected": {
+    "category_count": 2,
+    "class_count": 7,
+    "modality_count": 10,
+    "teams": 35,
+    "individual_extra_team_rows": 14,
+    "persisted_team_rows": 49,
+    "students": 224,
+    "enrollments": 322,
+    "students_by_modality_count": { "1": 140, "2": 70, "3": 14 },
+    "collective_matches": 15,
+    "individual_events": 4,
+    "individual_participants": 28,
+    "active_collective_points": 313,
+    "voided_collective_points": 1,
+    "fundraising_points": 427,
+    "sports_points": 400,
+    "sports_points_by_class": { "6EF": 100, "7EF": 40, "8EF": 60, "9EF": 100, "1EMA": 40, "2EMA": 60, "3EMA": 0 },
+    "fundraising_points_by_class": { "6EF": 49, "7EF": 53, "8EF": 57, "9EF": 61, "1EMA": 65, "2EMA": 69, "3EMA": 73 },
+    "penalty_points_per_class": 5,
+    "net_points_by_class": { "6EF": 144, "7EF": 88, "8EF": 112, "9EF": 156, "1EMA": 100, "2EMA": 124, "3EMA": 68 },
+    "award_points": { "1": 20, "2": 12, "3": 8 },
+    "podiums_by_category": {
+      "I": { "1": "6EF", "2": "8EF", "3": "7EF" },
+      "II": { "1": "9EF", "2": "2EMA", "3": "1EMA" }
+    },
+    "event_scores_by_modality": {
+      "FUTSAL": { "semifinal": [3, 1], "final": [4, 2] },
+      "QUEIMADA": { "semifinal": [7, 5], "final": [6, 4] },
+      "VOLEI": { "semifinal": [25, 21], "final": [25, 23] }
+    },
+    "penalty_points": 35,
+    "gross_points": 827,
+    "net_points": 792
+  }
+}

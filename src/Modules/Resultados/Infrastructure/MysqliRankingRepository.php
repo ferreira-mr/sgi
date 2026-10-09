@@ -102,4 +102,36 @@ final class MysqliRankingRepository implements RankingRepository
         return $rows;
     }
 
+    public function reconciliarEdicao(int $editionId): array
+    {
+        $sql = "UPDATE turmas t
+                INNER JOIN interclasses i ON i.id_interclasse = t.interclasses_id_interclasse
+                LEFT JOIN (
+                    SELECT id_interclasse, id_turma, SUM(pontos) AS pontuacao_esportes
+                    FROM pontuacoes_podio
+                    WHERE ativo = 1
+                    GROUP BY id_interclasse, id_turma
+                ) podios ON podios.id_interclasse = t.interclasses_id_interclasse AND podios.id_turma = t.id_turma
+                SET t.pontuacao_turma = ROUND(t.qtd_itens_arrecadados * i.valor_item_arrecadacao, 0) + COALESCE(podios.pontuacao_esportes, 0)
+                WHERE t.interclasses_id_interclasse = ?";
+        $statement = $this->connection->prepare($sql);
+        if ($statement === false) {
+            throw new RuntimeException('Não foi possível reconciliar ranking da edição.');
+        }
+        $statement->bind_param('i', $editionId);
+        if (!$statement->execute()) {
+            $statement->close();
+            throw new RuntimeException('Não foi possível reconciliar ranking da edição.');
+        }
+        $affected = $statement->affected_rows;
+        $statement->close();
+
+        $turmasAtualizadas = $this->list(['id_interclasse' => $editionId]);
+
+        return [
+            'reconciliadas' => $affected,
+            'total_turmas' => count($turmasAtualizadas),
+            'turmas' => $turmasAtualizadas,
+        ];
+    }
 }

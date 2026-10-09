@@ -92,7 +92,7 @@ window.SGIPage.mount("eventos/configurar-equipes", function (pageConfig, pageSco
                 return `<div class="turma-equipe-item d-flex align-items-center justify-content-between gap-3 p-3 mb-2 border rounded-3 bg-body" data-turma-card data-mod="${m.id_modalidade}" data-turma="${idTurma}">
                         <div>
                             <div class="fw-semibold">${esc(t.nome_turma)}</div>
-                            <div class="small text-secondary d-inline-flex align-items-center gap-1 fw-semibold"><i class="bi bi-people-fill"></i>${qtd} equipe${qtd === 1 ? '' : 's'}${temExcedida ? '<i class="fas fa-exclamation-triangle text-danger small" title="Esta turma possui equipe com alunos acima do limite"></i>' : ''}</div>
+                            <div class="small text-secondary d-inline-flex align-items-center gap-1 fw-semibold"><i class="bi bi-people-fill"></i>${qtd} equipe${qtd === 1 ? '' : 's'}${temExcedida ? '<i class="fas fa-exclamation-triangle text-danger small" title="Esta turma possui equipe com estudantes acima do limite"></i>' : ''}</div>
                         </div>
                         <button type="button" class="btn btn-outline-primary btn-sm ver-equipes-btn" data-mod="${m.id_modalidade}" data-turma="${idTurma}" data-turma-nome="${esc(t.nome_turma)}" title="Ver equipes">
                             <i class="fas fa-users-cog"></i>

@@ -125,7 +125,7 @@ test('E09 histórico de arrecadação diferencia erro de lista vazia e permite t
 
     await dialog.getByRole('button', { name: /Tentar novamente/i }).click();
     await expect(dialog).toContainText(/Nenhum registro de arrecadação encontrado para esta turma/i);
-    expect(consultasAoHistorico).toBe(2);
+    await expect.poll(() => consultasAoHistorico).toBe(2);
 });
 
 test('E09 falha ao salvar arrecadação preserva kg e libera os dois botões responsivos', async ({ page, request }) => {
@@ -168,6 +168,86 @@ test('E09 falha ao salvar arrecadação preserva kg e libera os dois botões res
     await expect(inputDesktop).toHaveValue('17.5');
     await expect(page.locator(`#listaArrecadacaoMobile [data-sgi-action="save-arrecadacao"][data-id-turma="${idTurma}"]`)).toBeEnabled();
     await expect(page.locator(`#listaArrecadacaoDesktop [data-sgi-action="save-arrecadacao"][data-id-turma="${idTurma}"]`)).toBeEnabled();
+});
+
+test('E09 replay de arrecadação após resposta perdida usa a mesma identidade e credita uma vez', async ({ page, request }) => {
+    const { idInterclasse, turma } = await obterEdicaoAtiva(request);
+    const idTurma = Number(turma.id_turma);
+    const antesResponse = await request.get(`api/v1/arrecadacao?id_interclasse=${idInterclasse}`);
+    const antes = await jsonOrThrow(antesResponse, 'histórico antes do replay de arrecadação');
+    const idsAntes = new Set(antes.map((row) => Number(row.id_historico)));
+    const quantidade = 1.3;
+    const mutationIds = [];
+    let attempts = 0;
+    let committedBeforeDrop = false;
+    let novosRegistros = [];
+
+    try {
+        await entrarComoAdmin(page);
+        await page.goto(`edicoes/arrecadacao?id=${idInterclasse}`, { waitUntil: 'domcontentloaded' });
+        const input = page.locator(`#listaArrecadacaoDesktop .arrec-input[data-id-turma="${idTurma}"]`);
+        const salvar = page.locator(`#listaArrecadacaoDesktop [data-sgi-action="save-arrecadacao"][data-id-turma="${idTurma}"]`);
+        await expect(input).toBeVisible({ timeout: 15_000 });
+        await input.fill(String(quantidade));
+
+        await page.route('**/api/v1/arrecadacao', async (route) => {
+            const requisicao = route.request();
+            if (requisicao.method() !== 'POST') {
+                await route.continue();
+                return;
+            }
+            attempts += 1;
+            mutationIds.push(await requisicao.headerValue('x-sgi-mutation-id'));
+            if (!committedBeforeDrop) {
+                const response = await route.fetch();
+                const body = await response.json();
+                expect(response.ok()).toBe(true);
+                expect(body.success).toBe(true);
+                committedBeforeDrop = true;
+                await route.abort('failed');
+                return;
+            }
+            await route.continue();
+        });
+
+        await salvar.click();
+        const feedbackFalha = page.getByRole('dialog');
+        await expect(feedbackFalha).toContainText(/Não foi possível salvar a arrecadação/i);
+        await feedbackFalha.getByRole('button', { name: 'Entendi' }).click();
+        await expect(input).toHaveValue(String(quantidade));
+        await salvar.click();
+        const feedbackSucesso = page.getByRole('dialog');
+        await expect(feedbackSucesso).toContainText(/Dados salvos com sucesso/i);
+        await feedbackSucesso.getByRole('button', { name: 'Entendi' }).click();
+        await expect(input).toHaveValue('0');
+
+        expect(attempts).toBe(2);
+        expect(committedBeforeDrop).toBe(true);
+        expect(mutationIds[0]).toMatch(/^arrecadacao-[a-z0-9-]{12,180}$/i);
+        expect(mutationIds[1]).toBe(mutationIds[0]);
+        const depoisResponse = await request.get(`api/v1/arrecadacao?id_interclasse=${idInterclasse}`);
+        const depois = await jsonOrThrow(depoisResponse, 'histórico depois do replay de arrecadação');
+        novosRegistros = depois.filter((row) => !idsAntes.has(Number(row.id_historico)));
+        expect(novosRegistros).toHaveLength(1);
+        expect(Number(novosRegistros[0].id_turma)).toBe(idTurma);
+        expect(Number(novosRegistros[0].quantidade)).toBe(quantidade);
+        expect(String(novosRegistros[0].status_historico)).toBe('1');
+    } finally {
+        if (novosRegistros.length === 0) {
+            const response = await request.get(`api/v1/arrecadacao?id_interclasse=${idInterclasse}`).catch(() => null);
+            if (response && response.ok()) {
+                const rows = await response.json().catch(() => []);
+                novosRegistros = rows.filter((row) => !idsAntes.has(Number(row.id_historico))
+                    && Number(row.id_turma) === idTurma
+                    && Number(row.quantidade) === quantidade);
+            }
+        }
+        for (const row of novosRegistros) {
+            await request.delete('api/v1/arrecadacao', {
+                data: { id_historico: Number(row.id_historico), id_interclasse: idInterclasse },
+            }).catch(() => null);
+        }
+    }
 });
 
 test('E09 ranking mantém dados principais confirmados se a consulta de categorias falha e os recupera ao tentar novamente', async ({ page, request }) => {
@@ -231,10 +311,11 @@ test('E09 ranking mantém dados principais confirmados se a consulta de categori
     await expect(page.locator('#msgDesk')).toContainText(/categorias.*indisponível|dados principais.*disponíveis/i);
 
     await page.getByRole('button', { name: /Tentar novamente/i }).click();
+    await expect(page.locator('#msgDesk')).not.toContainText(/categorias.*indisponível/i);
     await expect(lista.locator('.card-turma')).toContainText('Turma E09 Confirmada');
     await expect(page.locator('#totalTurmasDesk')).toContainText('1 Turmas');
-    expect(consultasDeRanking).toBe(2);
-    expect(consultasDeCategoria).toBe(2);
+    await expect.poll(() => consultasDeRanking).toBe(2);
+    await expect.poll(() => consultasDeCategoria).toBe(2);
 });
 
 test.describe('E09 estado de ranking do aluno', () => {

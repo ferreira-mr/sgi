@@ -10,7 +10,7 @@ include SGI_ROOT . '/resources/views/components/aluno-nav.php';
     <div class=" w-100 d-flex flex-column gap-4">
 
       <div class="aluno-hero bg-primary rounded-4 mb-4 text-white sgi-aluno-home-hero">
-        <h1>Olá, <?= htmlspecialchars($_SESSION['nome'] ?? 'Aluno', ENT_QUOTES) ?>!   </h1>
+        <h1>Olá, <?= htmlspecialchars($_SESSION['nome'] ?? 'Estudante', ENT_QUOTES) ?>!   </h1>
         <p>Confira as competições disponíveis e participe!</p>
 
         <!-- NOVO BOTÃO DE ACESSO AOS JOGOS -->
@@ -90,6 +90,4 @@ include SGI_ROOT . '/resources/views/components/aluno-nav.php';
 
 <script type="application/json" data-sgi-config="aluno/home"><?= json_encode([], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR) ?></script>
 <script data-sgi-page src="<?= \App\Shared\Http\Assets::url('js/pages/aluno/home.js') ?>"></script>
-<script src="<?= \App\Shared\Http\Assets::url('vendor/bootstrap/js/bootstrap.bundle.min.js') ?>" crossorigin="anonymous"></script>
-</body>
-</html>
+<?php include SGI_ROOT . '/resources/views/components/footer.php'; ?>

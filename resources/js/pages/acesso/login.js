@@ -90,9 +90,11 @@ window.SGIPage.mount("acesso/login", function (pageConfig, pageScope) {
                     window.location.href = await destinoDepoisDoLogin(data.redirect);
                 } else {
                     msgErro.textContent = data.mensagem || "Erro ao realizar o login.";
+                    if (typeof msgErro.focus === 'function') msgErro.focus({ preventScroll: true });
                 }
             } catch (err) {
                 msgErro.textContent = "Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.";
+                if (typeof msgErro.focus === 'function') msgErro.focus({ preventScroll: true });
             } finally {
                 form.dataset.sgiSubmitting = 'false';
                 form.removeAttribute('aria-busy');

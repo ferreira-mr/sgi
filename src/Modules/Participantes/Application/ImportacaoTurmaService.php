@@ -42,7 +42,7 @@ final class ImportacaoTurmaService
         $destination = $this->validateDestination($class, $edition);
         $students = $this->reader->read($path);
         if ($students === []) {
-            return ['success' => false, 'message' => 'Não foi possível extrair alunos do PDF. O PDF pode ser uma imagem (digitalizada). Tente usar um conversor online: https://www.ilovepdf.com/pt', 'fallback_converter' => true];
+            return ['success' => false, 'message' => 'Não foi possível extrair estudantes do PDF. O PDF pode ser uma imagem (digitalizada). Tente usar um conversor online: https://www.ilovepdf.com/pt', 'fallback_converter' => true];
         }
         foreach ($students as &$student) {
             $student['turma'] = $destination['nome'];
@@ -50,8 +50,8 @@ final class ImportacaoTurmaService
         unset($student);
         $result = $this->repository->import($students, $class, $destination['edicao']);
         if ($result['status'] !== 'sucesso') {
-            $message = $result['mensagem'] ?? 'Falha interna ao importar alunos.';
-            throw new RuntimeException(is_string($message) && $message !== '' ? $message : 'Falha interna ao importar alunos.');
+            $message = $result['mensagem'] ?? 'Falha interna ao importar estudantes.';
+            throw new RuntimeException(is_string($message) && $message !== '' ? $message : 'Falha interna ao importar estudantes.');
         }
         $parts = [];
         if ($result['cadastrados'] > 0) {

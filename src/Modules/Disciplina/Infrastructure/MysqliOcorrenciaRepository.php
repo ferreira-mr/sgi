@@ -209,12 +209,12 @@ final class MysqliOcorrenciaRepository implements OcorrenciaRepository
     {
         $statement = $this->connection->prepare('SELECT id_usuario FROM usuarios WHERE id_usuario = ? FOR UPDATE');
         if ($statement === false) {
-            throw new RuntimeException('Não foi possível serializar os cartões do atleta.');
+            throw new RuntimeException('Não foi possível serializar os cartões do estudante.');
         }
         $statement->bind_param('i', $userId);
         if (!$statement->execute() || $statement->get_result()->num_rows !== 1) {
             $statement->close();
-            throw new RuntimeException('Atleta não encontrado.');
+            throw new RuntimeException('Estudante não encontrado.');
         }
         $statement->close();
     }

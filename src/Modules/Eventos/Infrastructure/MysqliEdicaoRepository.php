@@ -86,6 +86,7 @@ final class MysqliEdicaoRepository implements EdicaoRepository
             }
             $id = (int) $this->connection->insert_id;
             $interclasse->close();
+            $this->initializePlanningIfAvailable($id);
             $this->deactivateOtherEditions($id);
             $categoryI = $this->createCategory($id, 'Categoria I');
             $categoryII = $this->createCategory($id, 'Categoria II');
@@ -333,6 +334,29 @@ final class MysqliEdicaoRepository implements EdicaoRepository
                     throw new RuntimeException('Não foi possível criar modalidades padrão.');
                 }
             }
+        }
+        $statement->close();
+    }
+
+    private function initializePlanningIfAvailable(int $editionId): void
+    {
+        $available = $this->connection->query("SELECT COUNT(*) AS total FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'interclasse_planejamentos'");
+        if ($available === false) {
+            return;
+        }
+        $row = $available->fetch_assoc();
+        $available->free();
+        if ((int) ($row['total'] ?? 0) === 0) {
+            return;
+        }
+        $statement = $this->connection->prepare("INSERT INTO interclasse_planejamentos (id_interclasse, cronograma_status, inscricoes_status) VALUES (?, 'rascunho', 'fechadas')");
+        if ($statement === false) {
+            throw new RuntimeException('Não foi possível inicializar o planejamento da edição.');
+        }
+        $statement->bind_param('i', $editionId);
+        if (!$statement->execute()) {
+            $statement->close();
+            throw new RuntimeException('Não foi possível inicializar o planejamento da edição.');
         }
         $statement->close();
     }

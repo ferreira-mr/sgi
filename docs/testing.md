@@ -44,10 +44,13 @@ As imagens usam PHP 8.4 por padrão. Para validar PHP 8.2:
 sh tools/test-docker.sh --database mariadb --php-version 8.2
 ```
 
-O comando executa, em sequência, `composer verify`, validação do Composer,
-build e checks JavaScript, a suíte HTTP/banco (`tests/run_all.php`) e os testes
-Playwright online/offline. Os resultados permanecem em `test-results/` e
-`tests/browser/{test-results,playwright-report}/`.
+O comando executa, em sequência, validação do Composer e `composer verify`,
+build das imagens com os assets da revisão, checks e testes JavaScript,
+integração HTTP/banco (`tests/run_all.php`) e Playwright online/offline. Os dois
+specs do navegador que validam componentes carregam os assets pela URL pública da
+aplicação; somente a imagem PHP os compila. Alterações somente em PHP ou testes
+reutilizam a camada de assets. Os resultados ficam em
+`test-results/` e `tests/browser/{test-results,playwright-report}/`.
 
 O contrato visual pode ser solicitado com `-IncludeVisual`/`--include-visual`.
 O container usa referências Linux (`*-linux.png`) versionadas separadamente das
@@ -70,8 +73,10 @@ powershell -ExecutionPolicy Bypass -File tools/test-local.ps1 -Suite all
 ```
 
 Os perfis disponíveis são `quality`, `integration`, `browser`, `visual` e
-`all`. `quality` não inicia banco nem servidor. `browser` e `visual` preparam a
-integração uma vez antes do Playwright. A seleção de backend local foi removida;
+`all`. `quality` não inicia banco nem servidor. `browser` e `visual` executam a
+integração antes do Playwright para preparar a mesma base descartável. `browser`
+inclui todos os specs não visuais, inclusive ranking individual. A seleção de
+backend local foi removida;
 os executores recusam qualquer tentativa de apontar para um SQL externo. O
 executor Docker cria um container temporário com `tmpfs`. O executor local
 mantém PHP/Node/Chromium no host e exige apenas os clientes `mysql`/`mysqldump`
@@ -79,6 +84,13 @@ para o ensaio de recuperação; isso não significa que exista um banco local.
 No Windows, os executáveis do XAMPP são encontrados automaticamente quando
 existem. Use `-Keep` apenas para investigar uma falha; o ambiente mantido deve
 ser removido manualmente depois.
+
+Durante o desenvolvimento, rode o subconjunto ligado à mudança: `composer
+test:unit` (PHPUnit), `npm test` (JavaScript) ou `npm --prefix tests/browser run
+test:offline-queue` (IndexedDB real e respostas HTTP controladas, sem servidor
+ou SQL). O atalho de fila seleciona somente `offline-queue-regression.spec.cjs`
+e desativa explicitamente o setup SQL para essa seleção fixa. Estes comandos
+focais não substituem a cobertura completa de integração e navegador na entrega.
 
 O executor usa um lock por checkout porque alguns cenários de recuperação
 criam bases auxiliares. Ele também passa um identificador de execução para que
@@ -91,16 +103,25 @@ dependências do navegador estão ausentes. Informe outro PHP com `-PhpPath` ou
 Composer, servidor e runner usam a mesma versão.
 
 Para medir o custo de um perfil em execuções repetidas, use o benchmark. Ele
-grava os tempos e códigos de saída em `test-results/` e calcula a mediana das
-execuções aprovadas:
+grava tempos, códigos de saída, primeira execução e repetições posteriores em
+`test-results/`. Cada execução grava `run-manifest.json` com revisão, estado do
+checkout, seleção, duração por etapa e código de saída. Playwright grava também
+um relatório JSON estruturado junto ao HTML. O runner de integração grava
+`integration-timings.json`, com a duração de cada classe de cenário em ordem
+decrescente. A mediana calcula a média dos dois valores centrais quando há um
+número par de aprovações:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/benchmark-tests.ps1 -Suite quality -Runs 3
 ```
 
-Para perfis que acessam o banco, o benchmark usa somente o container Docker.
-Compare primeira execução e repetições com cache separadamente; o arquivo JSON
-preserva cada medição.
+O modo `auto` usa Compose/PHP 8.4 para perfis com banco e o host para `quality`;
+assim, `all` inclui app, banco e navegador em containers descartáveis. Use
+`-Runner host` para medir o PHP/navegador no host com banco descartável, ou
+`-Runner compose -PhpVersion 8.2` para variar a versão de PHP no ambiente todo
+em containers. Se uma execução falhar, as repetições continuam e cada código
+de saída é salvo, mas só execuções completas aprovadas entram na mediana.
+Compare a primeira execução e as repetições em condições equivalentes.
 
 ## Execução manual do runner de baixo nível
 
@@ -131,15 +152,17 @@ referências.
 
 Os testes cobrem administração, portal do aluno, permissões, todas as telas principais e torneios com sete partidas. Os cenários offline desabilitam a rede do navegador, verificam IndexedDB e conferem no servidor o resultado após a reconexão.
 
-`offline-queue-regression.spec.cjs` usa o IndexedDB real do Chromium e respostas HTTP controladas, sem alterar o banco SQL. Cobre a ordem entre alterações novas e pendentes, respostas sem confirmação de sucesso (vazias, HTML, JSON truncado ou `status: erro`), compatibilidade com `status: sucesso`, dependências de ocorrências nas rotas v1, jogos temporários intercalados, aborto de transação local, aplicação de resultados v1 no chaveamento, sondagem do servidor local, coordenação entre abas e exportação/importação idempotente sem credencial CSRF. Para rodar somente essa regressão puramente local, sem a aplicação/SQL, defina explicitamente `SGI_BROWSER_REQUIRES_DATABASE=0`; a suíte de navegador completa exige o container. Os testes JavaScript também verificam a captura dos cadastros e a projeção de placares pelas rotas v1.
+`offline-queue-regression.spec.cjs` usa o IndexedDB real do Chromium e respostas HTTP controladas, sem alterar o banco SQL. Cobre a ordem entre alterações novas e pendentes, respostas sem confirmação de sucesso (vazias, HTML, JSON truncado ou `status: erro`), compatibilidade com `status: sucesso`, retry após falha de rede mantendo corpo e identidade da mutação, dependências de ocorrências nas rotas v1, jogos temporários intercalados, aborto de transação local, aplicação de resultados v1 no chaveamento, sondagem do servidor local, coordenação entre abas e exportação/importação idempotente sem credencial CSRF. `bootstrap-components.spec.cjs` também não usa SQL: monta o DOM no teste e carrega somente CSS/JavaScript estáticos. O Playwright mantém esses dois arquivos em um projeto de allowlist `independent`, com worker e diretório de saída próprios; todo o restante fica no projeto `database`, limitado a um worker. A execução completa inclui ambos os projetos, que podem rodar em paralelo sem compartilhar escrita no banco. O atalho `npm --prefix tests/browser run test:offline-queue` seleciona somente o teste da fila e não requer servidor ou SQL; a suíte completa ainda exige o container. Os testes JavaScript também verificam a captura dos cadastros e a projeção de placares pelas rotas v1.
 
 O cenário de chaveamento ímpar prepara três equipes com elenco e exige um avanço automático inicial. Se a preparação falhar, a suíte falha. A retificação de placar usa os identificadores criados pelo próprio teste e consulta os valores persistidos depois da alteração.
 
 `deployment-paths.spec.cjs` verifica redirecionamento, login, carregamento de arquivos e paridade das APIs no endereço configurado. Para testar uma instalação em subdiretório, inicie um servidor separado com `SGI_BASE_PATH=SGI` e execute esse teste com `SGI_BASE_URL=http://127.0.0.1:PORTA/SGI/`. O teste também roda normalmente na raiz. Os testes unitários usam sessões próprias em `test-results/unit-sessions/`, sem depender da pasta de sessões do servidor.
 
-`legacy-offline-compat.spec.cjs` cobre fila antiga sem `session`, alias antigo de mutação, isolamento entre operadores, casca sem `pageSources` e retry após falha de rede. A compatibilidade exige uma casca autenticada/preparada; refresh, nova aba e cold-open sem essa casca não são declarados como suporte porque o pacote não usa Service Worker.
+`legacy-offline-compat.spec.cjs` aparece em alguns relatórios e documentos históricos, mas não faz parte do inventário atual: foi removido durante a migração das rotas antigas para a API versionada. Não conte os cenários históricos de endpoint procedural ou casca antiga como execução da suíte atual. O fluxo offline suportado exige uma casca autenticada e preparada; refresh, nova aba e cold-open sem essa casca não são fluxos suportados porque o pacote não usa Service Worker.
 
 `visual-contract.spec.cjs` compara quatro imagens do login em desktop/mobile. A resposta de credenciais inválidas é fixa nesse teste visual; a autenticação real é validada separadamente. O fluxo Docker compara as referências Linux; a execução host+Docker do `test-local.ps1` usa as referências Windows.
+
+O gate Playwright falha se um caso passar somente após retry (`failOnFlakyTests`). Relatórios JSON, HTML, traces e screenshots mostram a duração e a tentativa com falha; uma tentativa posterior aprovada continua classificada como instável.
 
 Imagens, traces e relatório ficam em `tests/browser/test-results/` e `tests/browser/playwright-report/`. Só atualize snapshots após inspecionar uma mudança visual intencional. Testes aprovados cobrem os cenários descritos; não representam garantia de ausência de qualquer defeito.
 
@@ -149,7 +172,12 @@ O CI executa qualidade apenas em PHP 8.4. Integração HTTP/banco,
 navegador e contrato visual usam PHP 8.4 e MariaDB 10.11; o visual usa as
 referências Linux. A configuração está em `.github/workflows/ci.yml`. A matriz
 do CI usa uma única versão de PHP e MariaDB; MySQL e PHP 8.2 continuam disponíveis
-para execuções locais pelo executor Docker.
+para execuções locais pelo executor Docker. Buildx usa cache remoto de camadas
+separado para as imagens da aplicação e do navegador. Apenas o job de integração
+exporta esses caches; qualidade e visual apenas importam, evitando gravações
+concorrentes. Falha de exportação não interrompe os testes. O cache não contém
+resultado de teste, banco mutado ou sessão de usuário, portanto cada job continua
+executando seus comandos e reunindo seus próprios relatórios.
 
 `composer test:integration` executa `MigrationsTest`, que confirma a instalação
 repetida e os elementos estruturais esperados no baseline atual, além de
@@ -157,3 +185,13 @@ repetida e os elementos estruturais esperados no baseline atual, além de
 futuras e a reinstalação do baseline. As bases de teste são descartáveis e os
 ensaios não apontam para uma base de trabalho nem limpam filas IndexedDB. O
 container, projeto Compose e volumes são removidos ao final da execução normal.
+
+O perfil Docker completo reaplica `php bin/sgi.php migrate` depois da integração
+geral e antes do Playwright. Isso restaura o schema atual após os cenários que
+testam instalação incompleta, sem apagar os dados compartilhados do restante da
+suíte. Ao final, o runner recria uma base isolada para
+`FullInterclasseSimulationTest` e executa `full-interclasse-portal.spec.cjs` no
+projeto serial `simulation`. A spec autentica os 224 alunos sintéticos e confere
+suas inscrições; partidas e provas são exercitadas por HTTP nessa simulação. Os
+testes genéricos de placar/offline no projeto `database` usam fixtures próprias
+e não contam como S08 integrado da mesma edição.

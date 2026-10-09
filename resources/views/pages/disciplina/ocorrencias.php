@@ -55,7 +55,7 @@ $isAdmin = $nivelUsuario === 0;
             </div>
             <div class="modal-footer border-0 px-4 pb-3">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="btnSalvarOcrModal" onclick="salvarOcorrenciaModal()" >
+                <button type="button" class="btn btn-primary" id="btnSalvarOcrModal" >
                     <i class="bi bi-check-lg me-1"></i>Registrar
                 </button>
             </div>

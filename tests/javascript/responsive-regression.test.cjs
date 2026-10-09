@@ -61,6 +61,27 @@ test('a casca SPA não duplica o menu compacto ao remontar uma tela', () => {
     assert.match(mesarioOffline, /el\.closest\('\.sgi-mobile-menu'\)/);
 });
 
+test('a casca SPA copia somente a raiz dos modais das telas internas', () => {
+    assert.match(mesarioOffline, /var seletorPerifericos = '\[data-bs-toggle="modal"\],\[data-bs-target\],\[id\*="modal" i\],\[class\*="fab"\]';/);
+    assert.match(
+        mesarioOffline,
+        /if \(el\.parentElement && el\.parentElement\.closest\(seletorPerifericos\)\) return;/,
+        'campos com ids como ocrTituloModal não podem ser montados sem o contêiner .modal'
+    );
+    assert.match(ocorrenciasView, /<div class="modal fade" id="modalNovaOcorrencia"/);
+});
+
+test('a Agenda usa apenas o seu cabeçalho quando aberta pela casca do mesário', () => {
+    assert.match(dashboardView, /class="d-none d-md-flex align-items-center gap-3 sgi-mesario-topbar"/);
+    assert.match(
+        mesarioOffline,
+        /document\.querySelectorAll\('\.sgi-mesario-topbar'\)\.forEach\(function \(topbar\) \{[\s\S]*?var mostrar = tela === 'dashboard';[\s\S]*?topbar\.classList\.toggle\('sgi-mesario-topbar--oculta', !mostrar\);/,
+        'o cabeçalho persistente deve ficar oculto nas telas filhas, que já possuem cabeçalho próprio'
+    );
+    assert.match(sharedScss, /\.sgi-mesario-topbar\.sgi-mesario-topbar--oculta\s*\{[\s\S]*?display:\s*none\s*!important;/);
+    assert.match(agendaView, /include SGI_ROOT \. '\/resources\/views\/components\/page-header\.php';/);
+});
+
 test('as telas operacionais mantêm raízes compactas e desktop separadas', () => {
     assert.match(agendaView, /d-md-none ag-mobile sgi-agenda-mobile/);
     assert.match(agendaView, /d-none d-md-block main-desktop-layout sgi-agenda-desktop/);

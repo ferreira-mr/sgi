@@ -498,6 +498,13 @@ window.SGIPage.mount("participantes/turmas", function (pageConfig, pageScope) {
         excluirIdPendente = null;
     });
 
+    ['buscaTurmaMob', 'buscaTurmaDesk'].forEach((id) => {
+        const input = document.getElementById(id);
+        if (input) pageScope.listen(input, 'input', filtrarTurmas);
+    });
+    const arquivoUpload = document.getElementById('arquivoUpload');
+    if (arquivoUpload) pageScope.listen(arquivoUpload, 'change', mostrarNomeArquivo);
+
     /* ── INIT ── */
     window.SGIPage.ready( carregarTurmasAtivas);
 

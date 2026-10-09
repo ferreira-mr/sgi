@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1.7
-
 ARG PHP_VERSION=8.4
 
 FROM node:22-bookworm AS node-runtime
@@ -44,8 +42,13 @@ RUN composer install --no-interaction --prefer-dist --no-progress
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
 
-COPY . .
+# Assets depend on these inputs only. Keep this layer reusable for PHP, test,
+# or documentation-only edits while compiling from the exact checked-out sources.
+COPY resources/ ./resources/
+COPY tools/build-assets.cjs tools/css-bundles.json ./tools/
 RUN npm run build
+
+COPY . .
 
 COPY tools/docker-test-entrypoint.sh /usr/local/bin/docker-test-entrypoint
 COPY tools/docker-php.ini /usr/local/etc/php/conf.d/99-sgi-runtime.ini

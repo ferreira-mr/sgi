@@ -31,6 +31,12 @@ window.SGIPage.mount("competicoes/chaveamento", function (pageConfig, pageScope)
         return modalidadeEhIndividual(jogo);
     }
 
+    function jogoEhReal(jogo) {
+        if (!jogo || Number(jogo.id_jogo) <= 0) return false;
+        if (jogoEhIndividual(jogo)) return true;
+        return String(jogo.equipes_nomes || '').split(' vs ').filter(Boolean).length >= 2;
+    }
+
     function esc(s) {
         const d = document.createElement('div');
         d.textContent = s == null ? '' : String(s);
@@ -517,28 +523,72 @@ window.SGIPage.mount("competicoes/chaveamento", function (pageConfig, pageScope)
         return idInterclasse;
     }
 
-    function atualizarStats(jogos) {
-        const total = modalidadesCache.length;
-        const totalJogos = Array.isArray(jogos) ? jogos.length : 0;
-        const concluidos = Array.isArray(jogos) ? jogos.filter(j => j.status_jogo === 'Concluido' || j.status_jogo === 'Finalizado').length : 0;
-        const pendentes = totalJogos - concluidos;
+    function _contarCampeoesConfirmados(modalidades, resultados) {
+        const confirmados = new Set();
+        (Array.isArray(modalidades) ? modalidades : []).forEach(modalidade => {
+            const id = String(modalidade.id_modalidade || '');
+            const resultado = typeof resultados?.get === 'function' ? resultados.get(id) : resultados?.[id];
+            if (!id || !resultado || resultado.success !== true) return;
 
-        const modalidadesComCampeao = new Set();
-        if (Array.isArray(jogos)) {
-            jogos.forEach(j => {
-                const status = (j.status_jogo || '').toLowerCase();
-                const isConcluido = status === 'concluido' || status === 'finalizado';
-                if (!isConcluido) return;
-                const tag = j.nome_jogo || '';
-                const isFinalMM = /^MM:2:/.test(tag);
-                const isInd = jogoEhIndividual(j);
-                if (isFinalMM || isInd) {
-                    const idMod = j.modalidades_id_modalidade || j.id_modalidade;
-                    if (idMod) modalidadesComCampeao.add(String(idMod));
-                }
+            if (modalidadeEhIndividual(modalidade)) {
+                const jogo = resultado.jogo;
+                const concluido = jogo && ['concluido', 'finalizado'].includes(String(jogo.status_jogo || '').toLowerCase());
+                const primeiroLugar = Array.isArray(resultado.ranking)
+                    && resultado.ranking.some(item => Number(item.posicao) === 1 && Number(item.id_usuario) > 0);
+                if (concluido && primeiroLugar) confirmados.add(id);
+                return;
+            }
+
+            const jogos = Array.isArray(resultado.jogos) ? resultado.jogos : [];
+            const finalConfirmada = jogos.some(jogo => {
+                if (Number(jogo.fase_nivel) !== 2
+                    || !['concluido', 'finalizado'].includes(String(jogo.status_jogo || '').toLowerCase())
+                    || Number(jogo.equipe_vencedora_id) <= 0
+                    || !Array.isArray(jogo.equipes)) return false;
+                return jogo.equipes.some(equipe => Number(equipe.id_equipe) === Number(jogo.equipe_vencedora_id));
             });
+            if (finalConfirmada) confirmados.add(id);
+        });
+        return confirmados;
+    }
+
+    async function carregarCampeoesConfirmados() {
+        const resultados = new Map();
+        for (const modalidade of modalidadesCache) {
+            const id = String(modalidade.id_modalidade || '');
+            if (!id) continue;
+            // O chaveamento já reconstruído no navegador é a fonte autoritativa
+            // durante o offline. Não descarte o campeão local só porque a
+            // consulta HTTP da modalidade falhou ou foi atendida pelo cache.
+            if (_fonteDadosAtual !== 'remota'
+                && String(_currentModalidade) === id
+                && !modalidadeEhIndividual(modalidade)
+                && Array.isArray(_lastBracketData)) {
+                resultados.set(id, { success: true, jogos: _lastBracketData });
+                continue;
+            }
+            try {
+                const individual = modalidadeEhIndividual(modalidade);
+                const consulta = individual
+                    ? `${API_BASE}/chaveamentos?tipo_modalidade=individual&acao=ranking&id_modalidade=${encodeURIComponent(id)}`
+                    : `${API_BASE}/chaveamentos?acao=arvore&id_modalidade=${encodeURIComponent(id)}`;
+                const resposta = await fetch(consulta);
+                if (!resposta.ok) continue;
+                resultados.set(id, await resposta.json());
+            } catch (erro) {
+                console.warn('Não foi possível confirmar o campeão da modalidade:', id, erro);
+            }
         }
-        const totalCampeoes = modalidadesComCampeao.size;
+        return _contarCampeoesConfirmados(modalidadesCache, resultados);
+    }
+
+    function atualizarStats(jogos, campeoesConfirmados = new Set()) {
+        const total = modalidadesCache.length;
+        const jogosReais = Array.isArray(jogos) ? jogos.filter(jogoEhReal) : [];
+        const totalJogos = jogosReais.length;
+        const concluidos = jogosReais.filter(j => ['concluido', 'finalizado'].includes(String(j.status_jogo || '').toLowerCase())).length;
+        const pendentes = totalJogos - concluidos;
+        const totalCampeoes = Number.isInteger(campeoesConfirmados?.size) ? campeoesConfirmados.size : 0;
 
         ['statModalidades', 'statModalidadesMob'].forEach(id => {
             const el = document.getElementById(id);
@@ -679,7 +729,7 @@ window.SGIPage.mount("competicoes/chaveamento", function (pageConfig, pageScope)
             }
             return 'Competição Individual';
         }
-        const mm = tag.match(/^MM:(\d+):(\d+):([NB])$/);
+        const mm = tag.match(/^(?:PL:\d+:(?:-?\d+:)?)?MM:(\d+):(\d+):([NB])$/);
         if (mm) {
             const largura = parseInt(mm[1], 10);
             const slot = parseInt(mm[2], 10);
@@ -951,26 +1001,17 @@ window.SGIPage.mount("competicoes/chaveamento", function (pageConfig, pageScope)
     }
 
     function formatarDuracaoJogo(j) {
-        if (j.status_jogo !== 'Concluido' && j.status_jogo !== 'Finalizado') return '---';
-        if (j.data_inicio_real && j.termino_jogo) {
-            try {
-                const ini = new Date(j.data_jogo + 'T' + j.data_inicio_real);
-                const fim = new Date(j.data_jogo + 'T' + j.termino_jogo);
-                let diff = Math.max(0, Math.floor((fim - ini) / 60000));
-                const h = Math.floor(diff / 60);
-                const m = diff % 60;
-                if (h > 0) return h + 'h' + (m > 0 ? m + 'min' : '');
-                return m + 'min';
-            } catch (_) {}
-        }
-        if (j.duracao_jogo) {
-            const totalSec = parseInt(j.duracao_jogo, 10);
-            const h = Math.floor(totalSec / 3600);
-            const m = Math.floor((totalSec % 3600) / 60);
-            if (h > 0) return h + 'h' + (m > 0 ? m + 'min' : '');
-            return m + 'min';
-        }
-        return '---';
+        if (!['concluido', 'finalizado'].includes(String(j?.status_jogo || '').toLowerCase())) return '—';
+        const totalSec = Number(j?.duracao_jogo);
+        if (!Number.isFinite(totalSec) || totalSec <= 0) return '—';
+        const horas = Math.floor(totalSec / 3600);
+        const minutos = Math.floor((totalSec % 3600) / 60);
+        const segundos = Math.floor(totalSec % 60);
+        const partes = [];
+        if (horas > 0) partes.push(`${horas}h`);
+        if (minutos > 0) partes.push(`${minutos}min`);
+        if (segundos > 0) partes.push(`${segundos}s`);
+        return partes.join(' ') || '—';
     }
 
     function formatarAcrescimosJogo(j) {
@@ -993,7 +1034,7 @@ window.SGIPage.mount("competicoes/chaveamento", function (pageConfig, pageScope)
             }
         }
         var nomePartida = formatarNomePartida(j);
-        var m = (j.nome_jogo || '').match(/^MM:(\d+):/);
+        var m = (j.nome_jogo || '').match(/^(?:PL:\d+:(?:-?\d+:)?)?MM:(\d+):/);
         if (m) {
             var largura = parseInt(m[1], 10);
             var labelCorreto = labelsLarguras[largura];
@@ -1059,18 +1100,14 @@ window.SGIPage.mount("competicoes/chaveamento", function (pageConfig, pageScope)
             const idModalidade = document.getElementById('filtroModalidadeJogos' + sufixoAtivo).value;
             const idCategoria = document.getElementById('filtroCategoriaJogos' + sufixoAtivo).value;
 
-            let statsUrl = `${API_BASE}/jogos?id_interclasse=${idInterclasse}`;
+            let statsUrl = `${API_BASE}/jogos?visao=chaveamento&id_interclasse=${idInterclasse}`;
             const statsResp = await fetch(statsUrl);
             const statsData = await statsResp.json();
-            let statsJogos = Array.isArray(statsData) ? statsData : [];
-            statsJogos = statsJogos.filter(function(j) {
-                var nomes = (j.equipes_nomes || '').trim();
-                var isInd = jogoEhIndividual(j);
-                return isInd || (nomes.indexOf(' vs ') !== -1);
-            });
-            atualizarStats(statsJogos);
+            const statsJogos = Array.isArray(statsData) ? statsData.filter(jogoEhReal) : [];
+            const campeoesConfirmados = await carregarCampeoesConfirmados();
+            atualizarStats(statsJogos, campeoesConfirmados);
 
-            let url = `${API_BASE}/jogos?id_interclasse=${idInterclasse}`;
+            let url = `${API_BASE}/jogos?visao=chaveamento&id_interclasse=${idInterclasse}`;
             if (idModalidade) url += `&id_modalidade=${idModalidade}`;
             if (idCategoria) url += `&id_categoria=${idCategoria}`;
 
@@ -1078,11 +1115,7 @@ window.SGIPage.mount("competicoes/chaveamento", function (pageConfig, pageScope)
             const data = await resp.json();
             let jogos = Array.isArray(data) ? data : [];
 
-            jogos = jogos.filter(function(j) {
-                var nomes = (j.equipes_nomes || '').trim();
-                var isInd = jogoEhIndividual(j);
-                return isInd || (nomes.indexOf(' vs ') !== -1) || (nomes.length > 0);
-            });
+            jogos = jogos.filter(jogoEhReal);
 
             jogosCache = jogos;
 
@@ -1096,7 +1129,7 @@ window.SGIPage.mount("competicoes/chaveamento", function (pageConfig, pageScope)
             var larguras = [];
             var largurasSet = {};
             jogos.forEach(function(j) {
-                var m = (j.nome_jogo || '').match(/^MM:(\d+):/);
+                var m = (j.nome_jogo || '').match(/^(?:PL:\d+:(?:-?\d+:)?)?MM:(\d+):/);
                 if (m) {
                     var l = parseInt(m[1], 10);
                     if (l > 1 && !largurasSet[l]) {
@@ -1220,9 +1253,12 @@ window.SGIPage.mount("competicoes/chaveamento", function (pageConfig, pageScope)
         } else if (isIniciado) {
             statusCls += ' text-bg-primary';
             statusLabel = 'Em andamento';
+        } else if (jogo.status_jogo === 'Previsto') {
+            statusCls += ' text-bg-info';
+            statusLabel = 'Previsto';
         } else if (jogo.status_jogo === 'Aguardando') {
             statusCls += ' text-bg-warning';
-            statusLabel = 'Aguardando';
+            statusLabel = 'Aguardando participantes';
         } else {
             statusCls += ' text-bg-light border text-body-secondary';
         }
@@ -1243,9 +1279,11 @@ window.SGIPage.mount("competicoes/chaveamento", function (pageConfig, pageScope)
         let actionsHtml = '';
         const actionVisibility = acoesBracketSempreVisiveis() ? ' opacity-100' : '';
         const podeEditar = podeEditarJogo();
-        if (!isBye && !isConcluido && jogo.id_jogo) {
+        if (!jogo.virtual_planejado && !isBye && !isConcluido && jogo.id_jogo) {
             let botoes = '';
-            if (jogo.status_jogo === 'Agendado' && jogo.data_jogo && jogo.inicio_jogo && jogo.termino_jogo && jogo.locais_id_local) {
+            const horarioObrigatorio = jogo.exige_horario_agendado !== false;
+            const liberadoOffline = jogo._offline_liberado === true && eqs.length >= 2;
+            if (jogo.status_jogo === 'Agendado' && (liberadoOffline || (jogo.data_jogo && jogo.locais_id_local && (!horarioObrigatorio || (jogo.inicio_jogo && jogo.termino_jogo))))) {
                 botoes += `<a href="${APP_BASE}/jogos/placar?id_jogo=${jogo.id_jogo}" class="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1" title="Iniciar Jogo"><i class="bi bi-play-fill"></i>Iniciar</a>`;
             }
             if (podeEditar) {
@@ -1488,13 +1526,8 @@ window.SGIPage.mount("competicoes/chaveamento", function (pageConfig, pageScope)
                             <path d="M28 61 H40 V40 H52" stroke="#d1d5db" stroke-width="1.5" fill="none"/>
                         </svg>
                     </div>
-                    <div class="h4 fw-bold text-body mb-2" >Nenhum chaveamento gerado</div>
-                    <div class="small text-body-secondary mb-4" >Selecione uma modalidade acima para gerar automaticamente o chaveamento do torneio.</div>
-                    ${pageConfig.value0 ? `
-                    <button class="btn btn-primary d-inline-flex align-items-center gap-2" onclick="kvs_focus('selectModalidade');" >
-                        <i class="bi bi-diagram-3-fill"></i> Gerar Chaveamento
-                    </button>
-                    ` : ``}
+                    <div class="h4 fw-bold text-body mb-2" >Nenhum cronograma publicado</div>
+                    <div class="small text-body-secondary mb-4" >Publique o cronograma da edição para disponibilizar a árvore da competição.</div>
                 </div>`;
             area.innerHTML = emptyHtml;
             if (areaMob) areaMob.innerHTML = emptyHtml;
@@ -1605,8 +1638,8 @@ window.SGIPage.mount("competicoes/chaveamento", function (pageConfig, pageScope)
                 const emptyHtml = `
                     <div class="card border-0 shadow-sm rounded-4 text-center p-5">
                         <div class="display-5 text-body-tertiary mb-3"><i class="bi bi-diagram-3"></i></div>
-                        <div class="h5 fw-bold text-body mb-2">Nenhum chaveamento gerado</div>
-                        <div class="small text-body-secondary">Clique em "Gerar Chaveamento" para criar o chaveamento desta modalidade.</div>
+                        <div class="h5 fw-bold text-body mb-2">Nenhum cronograma publicado</div>
+                        <div class="small text-body-secondary">Publique o cronograma da edição para disponibilizar a árvore da competição.</div>
                     </div>`;
                 area.innerHTML = emptyHtml;
                 if (areaMob) areaMob.innerHTML = emptyHtml;
@@ -1625,6 +1658,11 @@ window.SGIPage.mount("competicoes/chaveamento", function (pageConfig, pageScope)
             const niveis = [...new Set(jogos.filter(j => !j.eh_disputa_posicao).map(j => j.fase_nivel))].sort((a, b) => b - a);
             atualizarTimeline(niveis);
             iniciarPolling();
+            if (_fonteDadosAtual !== 'remota') {
+                // Recalcula os indicadores depois que o motor local derivou os
+                // vencedores; antes disso o resumo só conhece o snapshot inicial.
+                await carregarJogos();
+            }
 
         } catch (e) {
             console.error("Erro ao carregar árvore:", e);
@@ -1733,77 +1771,6 @@ window.SGIPage.mount("competicoes/chaveamento", function (pageConfig, pageScope)
     registrarFiltroPareado('filtroCategoriaJogos', 'filtroCategoriaJogosMob');
     registrarFiltroPareado('filtroCategoriaJogosMob', 'filtroCategoriaJogos');
 
-    const btnGerarDesk = document.getElementById('btnGerarChaveamento');
-    if (btnGerarDesk) pageScope.listen(btnGerarDesk, 'click', async function() {
-        await gerarChaveamento(this, 'msgChaveamento');
-    });
-
-    const btnGerarMob = document.getElementById('btnGerarChaveamentoMob');
-    if (btnGerarMob) pageScope.listen(btnGerarMob, 'click', async function() {
-        const msgEl = document.getElementById('msgChaveamentoMob');
-        await gerarChaveamento(this, 'msgChaveamentoMob');
-    });
-
-    async function gerarChaveamento(btnEl, msgId) {
-        const msgEl = document.getElementById(msgId);
-        const btn = btnEl;
-        if (msgEl) msgEl.classList.remove('d-none');
-
-        if (NIVEL_USUARIO === 2 || NIVEL_USUARIO === 3) {
-            if (msgEl) msgEl.innerHTML = '<div class="alert alert-danger">Você não tem permissão para gerar chaveamento.</div>';
-            return;
-        }
-
-        const selectMobEl = document.getElementById('selectModalidadeMob');
-        const selectDeskEl = document.getElementById('selectModalidade');
-        const idModalidade = (selectMobEl && selectMobEl.offsetParent !== null)
-            ? selectMobEl.value
-            : (selectDeskEl ? selectDeskEl.value : '');
-
-        if (!idModalidade) {
-            msgEl.innerHTML = '<div class="alert alert-danger">Selecione uma modalidade primeiro.</div>';
-            return;
-        }
-
-        const mod = modalidadesCache.find(m => String(m.id_modalidade) === idModalidade);
-        const tipoCompeticao = resolverTipoCompeticao(mod);
-        if (!tipoCompeticao) {
-            msgEl.innerHTML = '<div class="alert alert-danger">O tipo da modalidade não está configurado.</div>';
-            return;
-        }
-        const isIndividual = tipoCompeticao === 'individual';
-        const tipoModalidadeParam = isIndividual ? 'individual' : 'mata_mata';
-
-        msgEl.innerHTML = '<div class="alert alert-info">' + (isIndividual ? 'Gerando jogo da modalidade para a agenda...' : 'Gerando chaveamento...') + '</div>';
-
-        try {
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Gerando...';
-                const resp = await fetch(`${API_BASE}/chaveamentos`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id_modalidade: Number(idModalidade), tipo_modalidade: tipoModalidadeParam, acao: 'gerar' })
-            });
-            const data = await resp.json();
-
-            if (data.success === false) throw new Error(data.message || 'Erro ao gerar chaveamento.');
-
-            const msgDet = data.jogos_criados ? ` (${data.jogos_criados} jogo(s) gerado(s))` : '';
-            msgEl.innerHTML = `<div class="alert alert-success">${esc(data.message || 'Chaveamento gerado com sucesso')}${esc(msgDet)}.</div>`;
-            const linkArvore = document.getElementById('linkVerArvore');
-            if (linkArvore) linkArvore.classList.remove('d-none');
-            const btnArvore = document.getElementById('btnVerArvore');
-            if (btnArvore) btnArvore.href = `${APP_BASE}/chaveamento?id=${idInterclasse}`;
-            carregarArvore(idModalidade);
-            carregarJogos();
-        } catch (err) {
-            msgEl.innerHTML = `<div class="alert alert-danger">${esc(err.message)}</div>`;
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-diagram-3-fill me-1"></i> Gerar Chaveamento';
-        }
-    }
-
     pageScope.listen(document.getElementById('inputBuscaJogo'), 'keyup', function() {
         var termo = this.value.toLowerCase().trim();
         var linhas = document.querySelectorAll('#tbodyJogos tr');
@@ -1850,9 +1817,12 @@ window.SGIPage.mount("competicoes/chaveamento", function (pageConfig, pageScope)
     // formatadores; só inicializa a rede quando a tela está presente.
     if (document.getElementById('selectModalidade')) iniciarChaveamento();
 
+    const formEditarJogo = document.getElementById('formEditarJogo');
+    if (formEditarJogo) pageScope.listen(formEditarJogo, 'submit', salvarEdicaoJogo);
+
     pageScope.onDeactivate(pararPolling);
     window.SGIPage.ready(function () { if (_currentModalidade) iniciarPolling(); });
     pageScope.listen(window, 'beforeunload', pararPolling);
 
-return {esc, podeEditarJogo, resolverTipoCompeticao, kvs_montarGrupos, kvs_sincronizar, kvs_montar, kvs_focus, resolverInterclasse, atualizarStats, atualizarTimeline, carregarModalidades, carregarCategorias, formatarNomePartida, _popularModalEdicao, editarJogo, editarJogoBracket, salvarEdicaoJogo, formatarDuracaoJogo, formatarAcrescimosJogo, renderizarLinhaJogo, carregarJogos, formatFase, computarLabelsFases, formatFaseFromNome, _badgeFonteLocal, _renderBracketMatch, _detectarCampeao, _renderModernBracket, _drawConnectors, editarJogoIndividual, carregarArvore, iniciarPolling, pararPolling, gerarChaveamento, iniciarChaveamento};
+return {esc, podeEditarJogo, resolverTipoCompeticao, kvs_montarGrupos, kvs_sincronizar, kvs_montar, kvs_focus, resolverInterclasse, atualizarStats, _contarCampeoesConfirmados, atualizarTimeline, carregarModalidades, carregarCategorias, formatarNomePartida, _popularModalEdicao, editarJogo, editarJogoBracket, salvarEdicaoJogo, formatarDuracaoJogo, formatarAcrescimosJogo, renderizarLinhaJogo, carregarJogos, formatFase, computarLabelsFases, formatFaseFromNome, _badgeFonteLocal, _renderBracketMatch, _detectarCampeao, _renderModernBracket, _drawConnectors, editarJogoIndividual, carregarArvore, iniciarPolling, pararPolling, iniciarChaveamento};
 });

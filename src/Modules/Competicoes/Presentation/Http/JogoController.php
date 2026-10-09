@@ -33,11 +33,26 @@ final class JogoController
             }
             try {
                 $filters = $request->allQuery();
-                if ((int) ($_SESSION['nivel'] ?? -1) === 2) {
+                $nivel = (int) ($_SESSION['nivel'] ?? -1);
+                $visao = $filters['visao'] ?? '';
+                if (!is_string($visao)) {
+                    return Response::json(['success' => false, 'message' => 'Visão de jogos inválida.'], 400);
+                }
+                if ($visao !== '' && $visao !== 'chaveamento') {
+                    return Response::json(['success' => false, 'message' => 'Visão de jogos inválida.'], 400);
+                }
+                unset($filters['visao']);
+                if ($visao === 'chaveamento') {
+                    unset($filters['operacional']);
+                }
+                if ($visao === 'chaveamento' && $nivel === 3) {
+                    return Response::json(['success' => false, 'message' => 'Alunos não podem consultar este histórico.'], 403);
+                }
+                if ($nivel === 2) {
                     if (($denied = $this->access->authorize()) !== null) {
                         return $denied;
                     }
-                    $filters['operacional'] = 1;
+                    $filters['operacional'] = $visao === 'chaveamento' ? 0 : 1;
                     $filters['id_interclasse'] = (int) ($this->access->context()->edicaoAtivaId ?? 0);
                 }
                 return Response::json($this->queries->list($filters));

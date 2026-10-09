@@ -168,7 +168,31 @@ final class AuditFixtures
         $statement = $connection->prepare('INSERT INTO interclasses (nome_interclasse, ano_interclasse, regulamento_interclasse, status_interclasse, ponto_1_lugar, ponto_2_lugar, ponto_3_lugar, valor_item_arrecadacao) VALUES (?, NOW(), ?, ?, 10, 7, 5, 2)');
         $regulamento = 'fixture-auditoria';
         $statement->bind_param('sss', $name, $regulamento, $status);
-        return self::executeInsert($statement);
+        $editionId = self::executeInsert($statement);
+        // O runner inicia a suíte sobre o baseline e aplica as migrações de
+        // cronograma mais adiante. Quando a tabela já estiver disponível, o
+        // fixture precisa respeitar o contrato final para que as jornadas de
+        // navegador possam preparar a edição offline.
+        if (self::tableExists($connection, 'interclasse_planejamentos')) {
+            $planning = $connection->prepare("INSERT INTO interclasse_planejamentos (id_interclasse, cronograma_status, inscricoes_status) VALUES (?, 'rascunho', 'fechadas')");
+            $planning->bind_param('i', $editionId);
+            if (!$planning->execute()) {
+                $planning->close();
+                throw new \RuntimeException('Não foi possível criar o planejamento da edição fixture.');
+            }
+            $planning->close();
+        }
+        return $editionId;
+    }
+
+    private static function tableExists(mysqli $connection, string $table): bool
+    {
+        $statement = $connection->prepare('SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?');
+        $statement->bind_param('s', $table);
+        $statement->execute();
+        $exists = (int) $statement->get_result()->fetch_column() > 0;
+        $statement->close();
+        return $exists;
     }
 
     private static function insertCategory(mysqli $connection, string $name, int $editionId): int

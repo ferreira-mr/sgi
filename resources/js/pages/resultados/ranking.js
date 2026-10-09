@@ -531,6 +531,9 @@ window.SGIPage.mount("resultados/ranking", function (pageConfig, pageScope) {
     }
 
     window.SGIPage.ready(() => {
+        document.querySelectorAll('.btn-imprimir').forEach((btn) => {
+            pageScope.listen(btn, 'click', () => window.print());
+        });
         vincularEventos();
         init();
     });

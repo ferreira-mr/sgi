@@ -1,6 +1,9 @@
 # Status da implementação offline HTTP
 
-Atualizado em 08/09/2026.
+Registro iniciado em 08/09/2026; verificações desta revisão atualizadas em 23/09/2026 (UTC).
+
+As medições e comandos antigos abaixo são históricos. Para executar a suíte atual,
+use os procedimentos de [testes](testing.md); esta página não é o guia operacional.
 
 ## Concluído nesta entrega
 
@@ -15,16 +18,13 @@ Atualizado em 08/09/2026.
 - A casca exige páginas obrigatórias com `schemaVersion` e `pageSources` para mostrar “pronto para offline”; uma agenda isolada ou uma marca antiga não é suficiente.
 - A fila pode ser exportada para JSON sem cookies, senhas ou tokens CSRF. O arquivo preserva as identidades das mutações, rejeita importação de outro operador e pode ser importado pelo próprio banner offline.
 
-## Validação executada
+## Validação
 
-- `npm run check`
-- `npm test`
-- `npm --prefix tests/browser test -- offline-queue-regression.spec.cjs` (17 testes)
-- `npm --prefix tests/browser test -- mesario-offline.spec.cjs`
-- `npm --prefix tests/browser test -- legacy-offline-compat.spec.cjs`
-- Suíte completa de navegador com `SGI_E2E_RESET=1` (47 testes, executada antes da última rodada de endurecimento de sessão/reserva; as regressões direcionadas foram repetidas depois).
+Em 08/09/2026, uma revisão anterior registrou `npm run check`, `npm test`, testes de navegador direcionados e uma suíte de 47 casos. Essa evidência é histórica: a suíte `legacy-offline-compat.spec.cjs` foi removida na migração para rotas versionadas e os comandos antigos não representam o inventário atual.
 
-Os testes de regressão offline cobrem timeout/servidor local, sessão expirada, respostas inválidas, dependências temporárias, aborto de transação local, chaveamento por rota v1, duas abas sincronizando simultaneamente e importação/exportação da fila.
+Na revisão de 23/09/2026, `npm --prefix tests/browser run test:offline-queue` passou com 27/27 casos, incluindo falha de rede com retenção da mutação e reenvio da mesma identidade. A execução completa foi `powershell -ExecutionPolicy Bypass -File tools/test-docker.ps1 -Database mariadb`: `all` passou em 558,729 s, com 169/169 testes Playwright, zero skips, inesperados ou flaky e 1.016/1.016 asserções de integração. A faixa sem SQL rodou junto à faixa de banco, sem elevar os workers que acessam SQL. O contrato visual não foi solicitado. O manifesto, relatório Playwright e tempos de integração estão em `test-results/docker-20260923_090237_9c2df8/`.
+
+Os testes offline atuais cobrem timeout/servidor local, sessão expirada, respostas inválidas, dependências temporárias, aborto de transação local, chaveamento por rota v1, coordenação entre abas, importação/exportação da fila e retry após falha de rede. O teste focal usa IndexedDB real e respostas controladas, sem SQL; a cobertura ponta a ponta continua incluída na execução completa.
 
 ## Ainda limitado por HTTP sem servidor
 
