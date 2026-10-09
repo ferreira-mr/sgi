@@ -53,14 +53,14 @@ final class EquipeRosterRules
         if ((string) ($student['status_usuario'] ?? '0') !== '1'
             || (string) ($student['nivel_usuario'] ?? '') !== '3'
         ) {
-            throw new InvalidArgumentException('Somente alunos ativos podem ser vinculados à equipe.');
+            throw new InvalidArgumentException('Somente estudantes ativos podem ser vinculados à equipe.');
         }
 
         if ((int) ($student['interclasses_id_interclasse'] ?? 0)
                 !== (int) ($class['interclasses_id_interclasse'] ?? 0)
             || (int) ($student['turmas_id_turma'] ?? 0) !== (int) ($team['turmas_id_turma'] ?? 0)
         ) {
-            throw new InvalidArgumentException('O aluno deve pertencer à mesma edição e turma da equipe.');
+            throw new InvalidArgumentException('O estudante deve pertencer à mesma edição e turma da equipe.');
         }
 
         if (!InscricaoRules::modalidadeCompativel(
@@ -69,7 +69,7 @@ final class EquipeRosterRules
             (int) ($class['categorias_id_categoria'] ?? 0),
             (int) ($modality['categorias_id_categoria'] ?? 0),
         )) {
-            throw new InvalidArgumentException('O gênero ou a categoria do aluno é incompatível com a modalidade.');
+            throw new InvalidArgumentException('O gênero ou a categoria do estudante é incompatível com a modalidade.');
         }
     }
 
@@ -79,7 +79,7 @@ final class EquipeRosterRules
         try {
             InscricaoRules::uniaoModalidades($existingModalityIds, [$targetModalityId]);
         } catch (InvalidArgumentException $exception) {
-            throw new InvalidArgumentException('Máximo de 3 modalidades permitidas por aluno.', 0, $exception);
+            throw new InvalidArgumentException('Máximo de 3 modalidades permitidas por estudante.', 0, $exception);
         }
     }
 
@@ -89,7 +89,7 @@ final class EquipeRosterRules
             throw new InvalidArgumentException('A quantidade de membros da equipe é inválida.');
         }
         if ($maxMembers !== null && $maxMembers > 0 && $activeMembers + $newMembers > $maxMembers) {
-            throw new InvalidArgumentException('A equipe atingiu o limite máximo de alunos.');
+            throw new InvalidArgumentException('A equipe atingiu o limite máximo de estudantes.');
         }
     }
 

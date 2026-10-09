@@ -275,7 +275,7 @@ window.SGIPage.mount("eventos/configurar-modalidades", function (pageConfig, pag
         }
     });
 
-    /* ── ALUNOS DESTAQUES ── */
+    /* ── ESTUDANTES EM DESTAQUE ── */
     function montarItemDestaque(a) {
         const temFoto = a.foto_usuario && !/^default\.(jpg|jpeg|png|gif|webp)$/i.test(a.foto_usuario);
         const fotoHtml = temFoto
@@ -311,7 +311,7 @@ window.SGIPage.mount("eventos/configurar-modalidades", function (pageConfig, pag
             const lista = Array.isArray(raw) ? raw : [];
 
             if (!lista.length) {
-                corpo.innerHTML = '<p class="text-muted text-center py-4">Nenhum aluno destaque registrado para este interclasse ainda.</p>';
+                corpo.innerHTML = '<p class="text-muted text-center py-4">Nenhum estudante em destaque registrado para este interclasse ainda.</p>';
                 return;
             }
 

@@ -168,7 +168,7 @@ test.describe.serial('E09 — recuperação da inscrição em modalidades', () =
         await retry.click();
 
         await expect(grid.locator('.modalidade-card')).toContainText('Futsal E09 recuperação');
-        expect(consultas).toBeGreaterThan(consultasAntesRetry);
+        await expect.poll(() => consultas).toBeGreaterThan(consultasAntesRetry);
         const apiBasePath = await page.evaluate(() => new URL(window.SGI_API_BASE, window.location.href).pathname);
         expect(caminhoEdicoes).toBe(`${apiBasePath}edicoes`);
     });
@@ -198,7 +198,7 @@ test.describe.serial('E09 — recuperação da inscrição em modalidades', () =
         await grid.getByRole('button', { name: /tentar novamente/i }).click();
         await expect(grid).toContainText('Nenhuma modalidade disponível para sua categoria no momento.');
         await expect(grid).not.toContainText(/erro|tentar novamente/i);
-        expect(consultas).toBe(2);
+        await expect.poll(() => consultas).toBe(2);
     });
 
     test('JSON inválido na lista de modalidades oferece retry sem apresentar vazio', async ({ page }) => {
@@ -226,7 +226,7 @@ test.describe.serial('E09 — recuperação da inscrição em modalidades', () =
         await expect(grid).not.toContainText('Nenhuma modalidade disponível');
         await grid.getByRole('button', { name: /tentar novamente/i }).click();
         await expect(grid.locator('.modalidade-card')).toContainText('Futsal E09 recuperação');
-        expect(consultas).toBe(2);
+        await expect.poll(() => consultas).toBe(2);
     });
 
     test('falha transitória de atualização mantém seleção de equipe e retry preserva a escolha', async ({ page }) => {
@@ -295,10 +295,11 @@ test.describe.serial('E09 — recuperação da inscrição em modalidades', () =
         await expect(card).toHaveAttribute('aria-pressed', 'true');
         await expect(card).toContainText('Equipe: Equipe E09 confirmada');
         await grid.getByRole('button', { name: /tentar novamente/i }).click();
+        await expect(grid.locator('.js-erro-modalidades')).toBeHidden();
         const restoredCard = page.locator('#modalidadesGrid .modalidade-card').filter({ hasText: 'Futsal E09 recuperação' });
         await expect(restoredCard).toHaveAttribute('aria-pressed', 'true');
         await expect(restoredCard).toContainText('Equipe: Equipe E09 confirmada');
-        expect(consultas).toBe(3);
+        await expect.poll(() => consultas).toBe(3);
 
         const apiBasePath = await page.evaluate(() => new URL(window.SGI_API_BASE, window.location.href).pathname);
         await expect(page.locator('#btnSalvar')).toBeEnabled();

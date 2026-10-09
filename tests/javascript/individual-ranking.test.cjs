@@ -125,10 +125,21 @@ test('carregarJogoLocalTemporario inicializa ocorrencias e popula turmas na fina
     };
     const partidasStore = [
         { id_partida: 'mm_local_-2_1', jogos_id_jogo: -2, equipes_id_equipe: 1, id_turma: 10, nome_turma: '3º A' },
-        { id_partida: 'mm_local_-2_2', jogos_id_jogo: -2, equipes_id_equipe: 2, turmas_id_turma: 20, nome_turma: '3º B' },
     ];
     const jogosStore = [
-        { id_jogo: -2, nome_jogo: 'MM:2:0:N', tipo_competicao: 'mata_mata', status_jogo: 'Agendado' },
+        {
+            id_jogo: -2,
+            nome_jogo: 'MM:2:0:N',
+            tipo_competicao: 'mata_mata',
+            status_jogo: 'Agendado',
+            equipes: [
+                { id_equipe: 1, id_turma: 10, nome_turma: '3º A' },
+                { id_equipe: 2, id_turma: 20, nome_turma: '3º B' },
+            ],
+        },
+    ];
+    const atletasStore = [
+        { id_usuario: 101, nome_usuario: 'Atleta da equipe 1', equipes_id_equipe: 1 },
     ];
     const window = {
         location: { search: '?id_jogo=-2' },
@@ -139,18 +150,53 @@ test('carregarJogoLocalTemporario inicializa ocorrencias e popula turmas na fina
             read: async (store) => {
                 if (store === 'jogos') return jogosStore;
                 if (store === 'partidas') return partidasStore;
+                if (store === 'atletas') return atletasStore;
                 return [];
             },
         },
         SGI: { alert: () => {}, confirm: async () => true },
     };
-    vm.runInNewContext(source, { window, document, bootstrap: window.bootstrap, SGI: window.SGI, URL, URLSearchParams, fetch: async () => ({ ok: true, text: async () => '[]' }), navigator: { onLine: false }, setTimeout, clearTimeout, console });
+    vm.runInNewContext(source, {
+        window,
+        document,
+        bootstrap: window.bootstrap,
+        SGI: window.SGI,
+        URL,
+        URLSearchParams,
+        fetch: async (url) => ({
+            ok: true,
+            text: async () => String(url).includes('ocorrencias?acao=listar_atletas')
+                ? JSON.stringify({ success: true, atletas: [
+                    { id_usuario: 101, nome_usuario: 'Turma 10', id_turma: 10 },
+                    { id_usuario: 202, nome_usuario: 'Turma 20', id_turma: 20 },
+                ] })
+                : '[]',
+        }),
+        navigator: { onLine: false },
+        setTimeout,
+        clearTimeout,
+        console,
+    });
 
     const select = document.getElementById('filtroTurmaOcorrencia');
     await api.carregarDados();
 
     assert.ok(select.innerHTML.includes('<option value="10">'), 'turma 10 deve estar no select');
     assert.ok(select.innerHTML.includes('<option value="20">'), 'turma 20 deve estar no select');
+    const selectEquipes = document.getElementById('selectEquipeArtilheiro');
+    assert.ok(selectEquipes.innerHTML.includes('value="1"'), 'primeira equipe deve estar disponível para registrar ponto');
+    assert.ok(selectEquipes.innerHTML.includes('value="2"'), 'equipe ausente em partidas deve ser recomposta para registrar ponto');
+    selectEquipes.value = '2';
+    await api.carregarAlunosArtilheiro();
+    const alunosPonto = document.getElementById('selectAlunoArtilheiro').innerHTML;
+    assert.ok(alunosPonto.includes('Turma 20'), 'registro de ponto deve usar o elenco offline por turma quando a store de atletas ainda não tiver a equipe da segunda fase');
+    assert.ok(!alunosPonto.includes('Turma 10'), 'registro de ponto não pode misturar atletas da outra turma');
+
+    select.value = '20';
+    await api.carregarAlunosOcorrencia();
+    const alunosOcorrencia = document.getElementById('selectAlunoOcorrencia').innerHTML;
+    assert.ok(alunosOcorrencia.includes('Turma 20'), 'ocorrência deve listar a turma selecionada');
+    assert.ok(!alunosOcorrencia.includes('Turma 10'), 'ocorrência não pode misturar atletas da outra turma');
 
     // abrirModalOcorrencia também garante o select atualizado
     select.innerHTML = '<option value="">Selecione a turma</option>';
@@ -161,5 +207,5 @@ test('carregarJogoLocalTemporario inicializa ocorrencias e popula turmas na fina
 
 test('chaveamento-engine preserva id_turma ao projetar equipes locais em partidas', () => {
     const source = fs.readFileSync('resources/js/offline/chaveamento-engine.js', 'utf8');
-    assert.ok(source.includes('id_turma: p.id_turma != null ? Number(p.id_turma) : null'), 'chaveamento-engine deve mapear id_turma a partir de partidasLocais');
+    assert.ok(source.includes('id_turma: partida.id_turma != null ? Number(partida.id_turma)'), 'chaveamento-engine deve mapear id_turma a partir de partidasLocais');
 });

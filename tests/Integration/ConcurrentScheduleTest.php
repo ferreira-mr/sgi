@@ -591,8 +591,16 @@ final class ConcurrentScheduleTest
         $worker = ['process' => $process, 'pipes' => $pipes, 'thread_id' => 0, 'exit_code' => -1];
         $readyFile = $barrier . DIRECTORY_SEPARATOR . 'ready-' . $id;
         self::waitForFile($readyFile, $worker, 'conexão independente ' . $id);
-        $ready = json_decode((string) file_get_contents($readyFile), true);
-        $threadId = (int) ($ready['db_thread'] ?? 0);
+        $threadId = 0;
+        $decodeDeadline = microtime(true) + 2.0;
+        while ($threadId <= 0 && microtime(true) < $decodeDeadline) {
+            clearstatcache(true, $readyFile);
+            $ready = json_decode((string) @file_get_contents($readyFile), true);
+            $threadId = is_array($ready) ? (int) ($ready['db_thread'] ?? 0) : 0;
+            if ($threadId <= 0) {
+                usleep(10000);
+            }
+        }
         if ($threadId <= 0) {
             self::stopWorker($worker);
             throw new RuntimeException('Worker de agendamento não informou a conexão ao banco.');
@@ -605,13 +613,22 @@ final class ConcurrentScheduleTest
     private static function waitForFile(string $path, array $worker, string $description): void
     {
         $deadline = microtime(true) + 8.0;
-        while (!is_file($path) && microtime(true) < $deadline) {
+        while (microtime(true) < $deadline) {
+            clearstatcache(true, $path);
+            if (is_file($path) && (int) @filesize($path) > 0) {
+                return;
+            }
             if (!proc_get_status($worker['process'])['running']) {
+                clearstatcache(true, $path);
+                if (is_file($path) && (int) @filesize($path) > 0) {
+                    return;
+                }
                 throw new RuntimeException('Worker encerrou antes da barreira: ' . $description . '.');
             }
             usleep(10000);
         }
-        if (!is_file($path)) {
+        clearstatcache(true, $path);
+        if (!is_file($path) || (int) @filesize($path) <= 0) {
             throw new RuntimeException('Worker não sinalizou: ' . $description . '.');
         }
     }

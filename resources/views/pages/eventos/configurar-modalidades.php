@@ -17,7 +17,7 @@ $paginaAtiva = 'dashboard';
     <p class="text-body-secondary mb-0">Gerencie as modalidades do interclasse e navegue para os detalhes de cada uma.</p>';
     $headerAcoesHtml = '<div class="d-flex align-items-center gap-2 flex-wrap sgi-config-modalities-actions">
         <button type="button" class="btn btn-outline-secondary d-inline-flex align-items-center gap-2 fw-bold px-3 py-2" data-bs-toggle="modal" data-bs-target="#modalDestaques">
-            <span>⭐</span> <span class="d-none d-sm-inline">Alunos Destaques</span><span class="d-sm-none">Destaques</span>
+            <span>⭐</span> <span class="d-none d-sm-inline">Estudantes em destaque</span><span class="d-sm-none">Destaques</span>
         </button>
         ' . ($nivelUsuario === 0 ? '
         <button type="button" class="btn btn-primary d-inline-flex align-items-center gap-2 fw-bold px-3 py-2 border-0 rounded-3" data-bs-toggle="modal" data-bs-target="#exampleModal">
@@ -92,12 +92,12 @@ $paginaAtiva = 'dashboard';
     </div>
 </div>
 
-<!-- Modal de Alunos Destaques -->
+<!-- Modal de estudantes em destaque -->
 <div class="modal fade" id="modalDestaques" tabindex="-1" aria-labelledby="modalDestaquesLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
         <div class="modal-content rounded-4" >
             <div class="modal-header border-0">
-                <h5 class="modal-title text-danger fw-bold" id="modalDestaquesLabel"><i class="bi bi-star-fill me-2 text-warning" aria-hidden="true"></i>Alunos Destaques</h5>
+                <h5 class="modal-title text-danger fw-bold" id="modalDestaquesLabel"><i class="bi bi-star-fill me-2 text-warning" aria-hidden="true"></i>Estudantes em destaque</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
             <div class="modal-body" id="corpoDestaques">

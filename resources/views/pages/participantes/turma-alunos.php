@@ -1,5 +1,5 @@
 <?php
-$titulo = 'Alunos da turma';
+$titulo = 'Estudantes da turma';
 $mostrarVoltar = true;
 $urlVoltar = \App\Shared\Http\Url::to('painel');
 $idVoltarMobile = 'btnVoltarTurmaAlunosMob';
@@ -22,20 +22,20 @@ $podeResetarSenha = in_array($nivelUsuario, [0], true);
     <div class="d-flex flex-wrap align-items-center gap-3 mb-4">
         <?php if ($podeGerenciar): ?>
         <button class="btn btn-outline-danger d-inline-flex align-items-center gap-2" onclick="abrirModalAluno()">
-            <i class="bi bi-plus-lg" aria-hidden="true"></i> Adicionar Aluno
+            <i class="bi bi-plus-lg" aria-hidden="true"></i> Adicionar estudante
         </button>
         <?php endif; ?>
         <div class="input-group flex-grow-1">
             <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
-            <label for="buscaAlunoMob" class="visually-hidden">Buscar aluno por nome ou RM</label>
-            <input type="text" class="form-control" id="buscaAlunoMob" placeholder="Buscar aluno por nome ou RM..." autocomplete="off">
+            <label for="buscaAlunoMob" class="visually-hidden">Buscar estudante por nome ou RM</label>
+            <input type="text" class="form-control" id="buscaAlunoMob" placeholder="Buscar estudante por nome ou RM..." autocomplete="off">
         </div>
     </div>
 
     <?php if ($nivelUsuario === 0): ?>
     <div class="card border shadow-sm overflow-hidden mb-4">
         <button class="btn w-100 d-flex align-items-center justify-content-between gap-3 p-3 text-start" id="botaoPdfMob" type="button" data-bs-toggle="collapse" data-bs-target="#blocoPdfMob" aria-expanded="false" aria-controls="blocoPdfMob">
-            <span class="d-flex align-items-center gap-2 fw-semibold"><i class="bi bi-file-earmark-pdf-fill text-danger" aria-hidden="true"></i> Importar alunos via PDF</span>
+            <span class="d-flex align-items-center gap-2 fw-semibold"><i class="bi bi-file-earmark-pdf-fill text-danger" aria-hidden="true"></i> Importar estudantes via PDF</span>
             <span class="d-flex align-items-center gap-2">
                 <span class="badge rounded-pill bg-danger-subtle text-danger-emphasis">Administrador</span>
                 <i class="bi bi-chevron-down" data-pdf-chevron aria-hidden="true"></i>
@@ -51,7 +51,7 @@ $podeResetarSenha = in_array($nivelUsuario, [0], true);
                     <div class="border rounded-3 p-4 text-center bg-body-tertiary" id="dropzoneMob" data-pdf-dropzone>
                         <i class="bi bi-cloud-arrow-up fs-1 text-danger" aria-hidden="true"></i>
                         <p class="small text-body-secondary mb-3 mt-2">Selecione um arquivo PDF ou arraste-o para esta área.</p>
-                        <label for="pdfInputMob" class="form-label fw-semibold d-block text-start">Selecionar PDF com a lista de alunos para esta turma</label>
+                        <label for="pdfInputMob" class="form-label fw-semibold d-block text-start">Selecionar PDF com a lista de estudantes para esta turma</label>
                         <input type="file" class="form-control text-start" name="pdf" id="pdfInputMob" accept="application/pdf" aria-describedby="descricaoPdfMob pdfNomeMob" required>
                         <span class="small text-body-secondary mt-2 d-block" id="descricaoPdfMob">Formato aceito: PDF de até 10 MB. O arquivo deve conter texto selecionável.</span>
                         <span class="d-none small fw-semibold text-success mt-2" id="pdfNomeMob" role="status" aria-live="polite" aria-atomic="true"></span>
@@ -96,8 +96,8 @@ $podeResetarSenha = in_array($nivelUsuario, [0], true);
 
         <?php
         $headerIdVoltar = 'btnVoltarTurmaAlunosDesk';
-        $headerCorpoHtml = '<h1 class="h3 fw-bold text-body mb-1">Alunos da Turma: <span id="nomeTurmaDesk">…</span></h1>
-        <p class="small text-body-secondary mb-0"><i class="bi bi-people-fill text-primary me-1" aria-hidden="true"></i> Gerencie os alunos vinculados a esta turma</p>';
+        $headerCorpoHtml = '<h1 class="h3 fw-bold text-body mb-1">Estudantes da turma: <span id="nomeTurmaDesk">…</span></h1>
+            <p class="small text-body-secondary mb-0"><i class="bi bi-people-fill text-primary me-1" aria-hidden="true"></i> Gerencie os estudantes vinculados a esta turma</p>';
         include SGI_ROOT . '/resources/views/components/page-header.php';
         unset($headerMostrarVoltar, $headerCorpoHtml, $headerAcoesHtml, $headerClasse, $headerUrlVoltar, $headerIdVoltar, $headerClassBotao, $headerHiddenBotao);
         ?>
@@ -105,13 +105,13 @@ $podeResetarSenha = in_array($nivelUsuario, [0], true);
         <div class="d-flex flex-wrap align-items-center gap-3 mb-4">
             <?php if ($podeGerenciar): ?>
             <button class="btn btn-outline-danger d-inline-flex align-items-center gap-2" onclick="abrirModalAluno()">
-                <i class="bi bi-plus-lg" aria-hidden="true"></i> Adicionar Aluno
+            <i class="bi bi-plus-lg" aria-hidden="true"></i> Adicionar estudante
             </button>
             <?php endif; ?>
             <div class="input-group flex-grow-1">
                 <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
-                <label for="buscaAlunoDesk" class="visually-hidden">Buscar aluno por nome ou RM</label>
-                <input type="text" class="form-control" id="buscaAlunoDesk" placeholder="Buscar aluno por nome ou RM..." autocomplete="off">
+                <label for="buscaAlunoDesk" class="visually-hidden">Buscar estudante por nome ou RM</label>
+                <input type="text" class="form-control" id="buscaAlunoDesk" placeholder="Buscar estudante por nome ou RM..." autocomplete="off">
             </div>
             <span class="badge rounded-pill text-bg-light border text-body-secondary" id="contadorAlunosDesk"></span>
         </div>
@@ -119,7 +119,7 @@ $podeResetarSenha = in_array($nivelUsuario, [0], true);
         <?php if ($nivelUsuario === 0): ?>
         <div class="card border shadow-sm overflow-hidden mb-4">
             <button class="btn w-100 d-flex align-items-center justify-content-between gap-3 p-3 text-start" id="botaoPdfDesk" type="button" data-bs-toggle="collapse" data-bs-target="#blocoPdfDesk" aria-expanded="false" aria-controls="blocoPdfDesk">
-                <span class="d-flex align-items-center gap-2 fw-semibold"><i class="bi bi-file-earmark-pdf-fill text-danger" aria-hidden="true"></i> Importar alunos via PDF</span>
+                <span class="d-flex align-items-center gap-2 fw-semibold"><i class="bi bi-file-earmark-pdf-fill text-danger" aria-hidden="true"></i> Importar estudantes via PDF</span>
                 <span class="d-flex align-items-center gap-2">
                     <span class="badge rounded-pill bg-danger-subtle text-danger-emphasis">Administrador</span>
                     <i class="bi bi-chevron-down" data-pdf-chevron aria-hidden="true"></i>
@@ -129,13 +129,13 @@ $podeResetarSenha = in_array($nivelUsuario, [0], true);
                 <div class="card-body p-3 pt-0">
                     <p class="alert alert-warning d-flex align-items-start gap-2 small mb-3">
                         <i class="bi bi-info-circle-fill" aria-hidden="true"></i>
-                        <span>O PDF deve conter <strong>texto selecionável</strong> (não imagem). Os alunos serão vinculados automaticamente a esta turma.</span>
+                        <span>O PDF deve conter <strong>texto selecionável</strong> (não imagem). Os estudantes serão vinculados automaticamente a esta turma.</span>
                     </p>
                     <form id="formPdfTurmaDesk" enctype="multipart/form-data">
                         <div class="border rounded-3 p-4 text-center bg-body-tertiary" id="dropzoneDesk" data-pdf-dropzone>
                             <i class="bi bi-cloud-arrow-up fs-1 text-danger" aria-hidden="true"></i>
                             <p class="small text-body-secondary mb-3 mt-2">Selecione um arquivo PDF ou arraste-o para esta área.</p>
-                            <label for="pdfInputDesk" class="form-label fw-semibold d-block text-start">Selecionar PDF com a lista de alunos para esta turma</label>
+                            <label for="pdfInputDesk" class="form-label fw-semibold d-block text-start">Selecionar PDF com a lista de estudantes para esta turma</label>
                             <input type="file" class="form-control text-start" name="pdf" id="pdfInputDesk" accept="application/pdf" aria-describedby="descricaoPdfDesk pdfNomeDesk" required>
                             <span class="small text-body-secondary mt-2 d-block" id="descricaoPdfDesk">Formato aceito: PDF de até 10 MB. O arquivo deve conter texto selecionável.</span>
                             <span class="d-none small fw-semibold text-success mt-2" id="pdfNomeDesk" role="status" aria-live="polite" aria-atomic="true"></span>
@@ -166,7 +166,7 @@ $podeResetarSenha = in_array($nivelUsuario, [0], true);
 
         <div class="card border shadow-sm overflow-hidden mt-4">
             <div class="card-header d-flex align-items-center justify-content-between gap-3">
-                <span class="fw-semibold"><i class="bi bi-people-fill text-primary me-1" aria-hidden="true"></i> Alunos cadastrados</span>
+                <span class="fw-semibold"><i class="bi bi-people-fill text-primary me-1" aria-hidden="true"></i> Estudantes cadastrados</span>
                 <span class="badge rounded-pill text-bg-light border text-body-secondary" id="taTableCount"></span>
             </div>
             <div class="table-responsive">
@@ -193,13 +193,13 @@ $podeResetarSenha = in_array($nivelUsuario, [0], true);
     </div>
 </main>
 
-<!-- Modal visualizar aluno -->
+<!-- Modal visualizar estudante -->
 <div class="modal fade" id="modalVerAluno" tabindex="-1" aria-labelledby="modalVerAlunoTitulo" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content rounded-4">
             <div class="modal-header border-0 pb-0">
-                <h6 class="modal-title" id="modalVerAlunoTitulo">Detalhes do aluno</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar janela Detalhes do aluno"></button>
+                <h6 class="modal-title" id="modalVerAlunoTitulo">Detalhes do estudante</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar janela Detalhes do estudante"></button>
             </div>
             <div class="modal-body">
                 <div class="rounded-circle bg-danger-subtle text-danger-emphasis fw-bold fs-3 d-flex align-items-center justify-content-center mx-auto mb-3 p-3" id="verInicial">—</div>
@@ -215,13 +215,13 @@ $podeResetarSenha = in_array($nivelUsuario, [0], true);
     </div>
 </div>
 
-<!-- Modal criar/editar aluno -->
+<!-- Modal criar/editar estudante -->
 <div class="modal fade" id="modalAluno" tabindex="-1" aria-labelledby="modalAlunoTitulo" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content rounded-4">
             <div class="modal-header">
-                <h6 class="modal-title" id="modalAlunoTitulo">Adicionar aluno</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar janela Aluno"></button>
+                <h6 class="modal-title" id="modalAlunoTitulo">Adicionar estudante</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar janela Estudante"></button>
             </div>
             <form id="formAluno" novalidate>
                 <div class="modal-body">
@@ -264,7 +264,7 @@ $podeResetarSenha = in_array($nivelUsuario, [0], true);
         <div class="modal-content rounded-4">
             <div class="modal-body text-center py-4">
                 <i class="bi bi-exclamation-triangle text-danger fs-1" aria-hidden="true"></i>
-                <h5 class="mt-3 mb-1 fw-medium" id="modalConfirmarExcluirTitulo">Remover aluno?</h5>
+                <h5 class="mt-3 mb-1 fw-medium" id="modalConfirmarExcluirTitulo">Remover estudante?</h5>
                 <p class="text-muted small" id="nomeAlunoExcluir"></p>
             </div>
             <div class="modal-footer justify-content-center border-0 pt-0">
@@ -281,7 +281,7 @@ $podeResetarSenha = in_array($nivelUsuario, [0], true);
         <div class="modal-content rounded-4">
             <div class="modal-body text-center py-4">
                 <i class="bi bi-key-fill text-warning fs-1" aria-hidden="true"></i>
-                <h5 class="mt-3 mb-1 fw-medium" id="modalResetarSenhaTitulo">Resetar senha do aluno?</h5>
+                <h5 class="mt-3 mb-1 fw-medium" id="modalResetarSenhaTitulo">Resetar senha do estudante?</h5>
                 <p class="text-muted small mb-1" id="nomeAlunoResetar"></p>
                 <p class="text-muted small">A senha será redefinida para <strong>sesi-senai</strong>, e a troca será obrigatória no próximo acesso.</p>
             </div>

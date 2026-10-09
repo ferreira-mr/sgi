@@ -88,7 +88,7 @@ async function carregarAlertaLimite() {
         let msg = `<i class="bi bi-exclamation-triangle-fill"></i>`;
         msg += `<span class="flex-grow-1"><strong>Limite excedido:</strong> esta equipe possui <strong>${total}</strong> inscritos e o limite da modalidade é <strong>${limite}</strong>.</span>`;
         if (isAdmin) {
-            msg += '<button type="button" class="btn btn-primary btn-sm flex-shrink-0" data-sgi-action="redistribute-roster"><i class="bi bi-shuffle"></i> Enviar alunos para as outras equipes</button>';
+            msg += '<button type="button" class="btn btn-primary btn-sm flex-shrink-0" data-sgi-action="redistribute-roster"><i class="bi bi-shuffle"></i> Enviar estudantes para as outras equipes</button>';
         }
 
         if (mob) { mob.innerHTML = msg; mob.classList.remove('d-none'); }
@@ -99,7 +99,7 @@ async function carregarAlertaLimite() {
 }
 
 async function redistribuirElenco() {
-    if (!await SGI.confirm({ titulo: 'Redistribuir alunos?', mensagem: 'Os alunos excedentes serão enviados para outras equipes desta turma.', textoConfirmar: 'Redistribuir' })) return;
+    if (!await SGI.confirm({ titulo: 'Redistribuir estudantes?', mensagem: 'Os estudantes excedentes serão enviados para outras equipes desta turma.', textoConfirmar: 'Redistribuir' })) return;
     try {
         const resp = await fetch(`${API}equipes`, {
             method: 'POST',
@@ -139,9 +139,9 @@ async function carregar() {
         const arr = Array.isArray(lista) ? lista : [];
 
         if (arr.length === 0) {
-            const msg = '<div class="text-center py-5 text-body-secondary"><i class="bi bi-people fs-1 d-block mb-3" aria-hidden="true"></i><h5 class="fw-semibold mb-2">Elenco vazio</h5><p class="small mb-0">Nenhum jogador vinculado a esta equipe ainda.</p></div>';
+            const msg = '<div class="text-center py-5 text-body-secondary"><i class="bi bi-people fs-1 d-block mb-3" aria-hidden="true"></i><h5 class="fw-semibold mb-2">Elenco vazio</h5><p class="small mb-0">Nenhum estudante vinculado a esta equipe ainda.</p></div>';
             mob.innerHTML = msg;
-            tbody.innerHTML = `<tr><td colspan="${isAdmin ? 3 : 2}" class="text-muted px-3 py-4">Nenhum jogador vinculado a esta equipe ainda.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="${isAdmin ? 3 : 2}" class="text-muted px-3 py-4">Nenhum estudante vinculado a esta equipe ainda.</td></tr>`;
             return;
         }
 
@@ -152,7 +152,7 @@ async function carregar() {
                     <div class="text-muted small">${esc(u.matricula_usuario)}</div>
                 </div>
                 ${isAdmin ? `
-                    <button type="button" data-sgi-action="remove-roster-student" data-id-usuario="${esc(u.id_usuario)}" data-id-equipe="${esc(idEquipe)}" class="btn btn-outline-danger btn-sm px-3 py-1 small" aria-label="Remover aluno da equipe">
+                    <button type="button" data-sgi-action="remove-roster-student" data-id-usuario="${esc(u.id_usuario)}" data-id-equipe="${esc(idEquipe)}" class="btn btn-outline-danger btn-sm px-3 py-1 small" aria-label="Remover estudante da equipe">
                         <i class="bi bi-trash"></i>
                     </button>
                 ` : ''}
@@ -165,7 +165,7 @@ async function carregar() {
                 <td>${esc(u.matricula_usuario)}</td>
                 ${isAdmin ? `
                     <td class="text-end">
-                        <button type="button" data-sgi-action="remove-roster-student" data-id-usuario="${esc(u.id_usuario)}" data-id-equipe="${esc(idEquipe)}" class="btn btn-outline-danger btn-sm px-3 py-1 small" aria-label="Remover aluno da equipe">
+                        <button type="button" data-sgi-action="remove-roster-student" data-id-usuario="${esc(u.id_usuario)}" data-id-equipe="${esc(idEquipe)}" class="btn btn-outline-danger btn-sm px-3 py-1 small" aria-label="Remover estudante da equipe">
                             <i class="bi bi-trash"></i>
                         </button>
                     </td>
@@ -181,7 +181,7 @@ async function carregar() {
 }
 
 async function removerAluno(idUsuario, idEquipe) {
-    if (!await SGI.confirm({ titulo: 'Remover aluno da equipe?', mensagem: 'O vínculo do aluno com esta equipe será removido.', textoConfirmar: 'Remover aluno', destrutivo: true })) return;
+    if (!await SGI.confirm({ titulo: 'Remover estudante da equipe?', mensagem: 'O vínculo do estudante com esta equipe será removido.', textoConfirmar: 'Remover estudante', destrutivo: true })) return;
 
     try {
         const response = await fetch(`${API}equipes`, {
@@ -197,11 +197,11 @@ async function removerAluno(idUsuario, idEquipe) {
         if (res.success) {
             carregar();
         } else {
-            SGI.alert(res.message || 'Erro ao remover aluno.');
+            SGI.alert(res.message || 'Erro ao remover estudante.');
         }
     } catch (e) {
         console.error('Erro de requisição:', e);
-        SGI.alert('Erro de conexão ao tentar remover o aluno.');
+        SGI.alert('Erro de conexão ao tentar remover o estudante.');
     }
 }
 

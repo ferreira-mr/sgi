@@ -74,6 +74,7 @@ final class PageTitleTest extends TestCase
         self::assertStringContainsString('const tituloPagina = String(metaTituloPagina', $adminHeader);
         self::assertStringContainsString("tituloPagina + ' | SGI'", $adminHeader);
         self::assertStringNotContainsString('SGI - Alunos da Turma', $turmaAlunos);
+        self::assertStringNotContainsString('SGI - Estudantes da turma', $turmaAlunos);
         self::assertStringNotContainsString('document.title = TELA_TITULO', $offline);
         self::assertStringContainsString('document.title = tituloDocumento(rec.titulo, TELA_TITULO[tela]);', $offline);
     }

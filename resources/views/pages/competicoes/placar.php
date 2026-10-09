@@ -120,7 +120,7 @@ $paginaAtiva = 'dashboard';
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label" for="selectAlunoOcorrencia">Aluno</label>
+                        <label class="form-label" for="selectAlunoOcorrencia">Estudante</label>
                         <select class="form-select" id="selectAlunoOcorrencia" required disabled>
                             <option value="">Selecione uma turma primeiro</option>
                         </select>
@@ -168,7 +168,7 @@ $paginaAtiva = 'dashboard';
                         </select>
                     </div>
                     <div class="mb-2">
-                        <label class="form-label" for="selectAlunoArtilheiro">Aluno responsável pela jogada</label>
+                        <label class="form-label" for="selectAlunoArtilheiro">Estudante responsável pela jogada</label>
                         <select class="form-select" id="selectAlunoArtilheiro" aria-required="true">
                             <option value="">Selecione uma equipe primeiro</option>
                         </select>

@@ -44,9 +44,14 @@ final class MysqliChaveamentoManagement implements ChaveamentoManagement
                 ? ['success' => true, 'participantes' => MysqliIndividualRepository::buscarParticipantes($this->connection, $id)]
                 : MysqliIndividualRepository::montarJsonRanking($this->connection, $id);
         }
-        return $action === 'historico'
-            ? MysqliChaveamentoRepository::montarHistorico($this->connection, $id)
-            : MysqliChaveamentoRepository::montarJsonArvore($this->connection, $id);
+        return $this->atomic(function () use ($id, $action): array {
+            // Mantém chaves antigas coerentes quando um bye no último slot já
+            // estava concluído antes da correção do avanço.
+            MysqliChaveamentoRepository::reconciliarAvancosPendentes($this->connection, $id);
+            return $action === 'historico'
+                ? MysqliChaveamentoRepository::montarHistorico($this->connection, $id)
+                : MysqliChaveamentoRepository::montarJsonArvore($this->connection, $id);
+        });
     }
 
     public function saveIndividual(int $id, ?array $ranking, ?int $gameId = null): array

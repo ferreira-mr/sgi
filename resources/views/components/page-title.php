@@ -18,13 +18,13 @@ if ($tituloPagina === '') {
         'aluno/trocar-senha' => 'Alterar senha',
         'categorias' => 'Categorias',
         'chaveamento' => 'Chaveamentos',
-        'equipes/alunos' => 'Alunos da equipe',
+        'equipes/alunos' => 'Estudantes da equipe',
         'equipes/elenco' => 'Elenco da equipe',
         'edicoes' => 'Edições',
         'jogos/placar' => 'Placar',
         'modalidades/detalhes' => 'Modalidade',
         'ocorrencias' => 'Ocorrências',
-        'turmas/alunos' => 'Alunos da turma',
+        'turmas/alunos' => 'Estudantes da turma',
         'turmas' => 'Turmas',
     ];
     $tituloPagina = $titulosPorRota[$caminhoRequisicao] ?? 'SGI';

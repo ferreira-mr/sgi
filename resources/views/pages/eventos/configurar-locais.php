@@ -192,7 +192,7 @@ $isColaborador = $nivelUsuario === 1;
                             <strong>Gestão de Materiais e Locais:</strong> Responsabilizo-me pelo uso adequado e supervisão dos materiais esportivos, espaços e instalações alocadas, zelando pela integridade do patrimônio institucional.
                         </div>
                         <div class="border-start border-4 border-danger ps-3 mb-3">
-                            <strong>Segurança e Bem-estar:</strong> Comprometo-me a zelar pela integridade e segurança dos alunos e participantes, acionando o suporte adequado e informando a organização imediatamente diante de eventuais incidentes.
+                            <strong>Segurança e Bem-estar:</strong> Comprometo-me a zelar pela integridade e segurança dos estudantes e participantes, acionando o suporte adequado e informando a organização imediatamente diante de eventuais incidentes.
                         </div>
                         <div class="border-start border-4 border-danger ps-3 mb-3">
                             <strong>Uso de Imagem:</strong> Autorizo o uso de minha imagem e voz para fins institucionais e de divulgação oficial do evento nas mídias da instituição.

@@ -137,10 +137,10 @@ test.describe('E03 — nomes acessíveis em pontuação, agenda e modalidades', 
         }
         await esperarModalFechado(modalConfiguracao);
 
-        const botaoDestaques = page.getByRole('button', { name: /Alunos Destaques/ });
+        const botaoDestaques = page.getByRole('button', { name: /Estudantes em destaque/ });
         const modalDestaques = page.locator('#modalDestaques');
         await esperarModalAberto(botaoDestaques, modalDestaques);
-        await expect(page.getByRole('dialog', { name: 'Alunos Destaques' })).toBeVisible();
+        await expect(page.getByRole('dialog', { name: 'Estudantes em destaque' })).toBeVisible();
         await esperarModalFechado(modalDestaques);
 
         await page.setViewportSize({ width: 390, height: 844 });

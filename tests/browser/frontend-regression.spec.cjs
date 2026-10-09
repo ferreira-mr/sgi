@@ -230,7 +230,7 @@ test.describe('Frontend — regressão visual por perfil', () => {
             const mobileList = page.locator('#listaAlunosMobile');
             await expect(desktopList).toContainText(matriculas[0]);
             await expect(desktopList).toContainText(matriculas[1]);
-            await expect(desktopList).not.toContainText('Erro ao carregar alunos.');
+            await expect(desktopList).not.toContainText('Erro ao carregar estudantes.');
             await expect(desktopList.locator('img, svg[onload]')).toHaveCount(0);
 
             await page.locator('#buscaAlunosDesktop').fill(matriculas[0]);
@@ -271,7 +271,7 @@ test.describe('Frontend — regressão visual por perfil', () => {
             expect(saved.status()).toBe(200);
             expect(JSON.parse(submitted.postData() || '{}').usuarios).toEqual([Number(primeiro.id_usuario)]);
             await expect(page.locator('#btnSalvarAlunosDesktop')).toBeDisabled();
-            await expect(page.locator('#btnSalvarAlunosDesktop')).toHaveAccessibleName(/Adicionar 0 alunos/);
+            await expect(page.locator('#btnSalvarAlunosDesktop')).toHaveAccessibleName(/Adicionar 0 estudantes/);
             await expect(page.locator('#buscaAlunosDesktop')).toHaveValue(matriculas[0]);
             await expect(desktopList.locator('label')).toHaveCount(1);
             await expect(desktopList).toContainText(matriculas[0]);

@@ -156,7 +156,7 @@ final class MysqliIndividualRepository
             $idParticipante = (int) $participante['id_usuario'];
             if (isset($participantesPorId[$idParticipante])
                 && (int) $participantesPorId[$idParticipante]['id_equipe'] !== (int) $participante['id_equipe']) {
-                throw new \RuntimeException('O atleta possui vínculos conflitantes nesta modalidade.');
+                throw new \RuntimeException('O estudante possui vínculos conflitantes nesta modalidade.');
             }
             $participantesPorId[$idParticipante] = $participante;
         }

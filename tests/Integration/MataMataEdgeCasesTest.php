@@ -25,10 +25,10 @@ final class MataMataEdgeCasesTest
             }
         }
         $created = $admin->postJson('api/v1/modalidades', [
-            'nome_modalidade' => 'Vôlei três equipes',
+            'nome_modalidade' => 'Vôlei cinco equipes',
             'genero_modalidade' => 'MISTO',
             'max_inscrito_modalidade' => 10,
-            'max_equipes' => 3,
+            'max_equipes' => 5,
             'tipos_modalidades_id_tipo_modalidade' => 1,
             'categorias_id_categoria' => $category,
             'interclasses_id_interclasse' => $idEdicao,
@@ -39,9 +39,9 @@ final class MataMataEdgeCasesTest
             throw new \RuntimeException('Não foi possível preparar o teste de chaveamento ímpar.');
         }
         $students = $admin->get("api/v1/usuarios?acao=listar_competidores&id_turma=$idTurma&id_interclasse=$idEdicao");
-        $roster = array_slice($students['json']['competidores'] ?? [], -3);
-        Assertions::assert('Três competidores disponíveis para o chaveamento ímpar', count($roster) === 3);
-        if (count($roster) !== 3) {
+        $roster = array_slice($students['json']['competidores'] ?? [], -5);
+        Assertions::assert('Cinco competidores disponíveis para o chaveamento ímpar', count($roster) === 5);
+        if (count($roster) !== 5) {
             throw new \RuntimeException('Elenco insuficiente para o teste.');
         }
         foreach ($roster as $index => $student) {
@@ -58,10 +58,14 @@ final class MataMataEdgeCasesTest
         }
         $generated = $admin->postJson('api/v1/chaveamentos', ['id_modalidade' => $modality]);
         Assertions::assertJsonSuccess('Geração de chaveamento com três equipes e elenco', $generated);
-        Assertions::assert('Chaveamento ímpar registra um avanço automático inicial', (int) ($generated['json']['bye_inicial'] ?? 0) === 1);
+        Assertions::assert('Chaveamento de cinco equipes registra um bye inicial', (int) ($generated['json']['bye_inicial'] ?? 0) === 1);
         $old = $admin->get("api/v1/chaveamentos?id_modalidade=$modality");
         $new = $admin->get("api/v1/chaveamentos?id_modalidade=$modality");
         Assertions::assert('Árvore versionada preserva jogos e avanços da URL antiga', is_array($old['json']['jogos'] ?? null) && $new['json'] === $old['json']);
+        $firstRound = array_values(array_filter($old['json']['jogos'] ?? [], static fn (array $game): bool => str_starts_with((string) ($game['nome_jogo'] ?? ''), 'MM:8:')));
+        $byeCount = count(array_filter($firstRound, static fn (array $game): bool => ($game['eh_bye'] ?? false) === true));
+        $matchCount = count(array_filter($firstRound, static fn (array $game): bool => count($game['equipes'] ?? []) === 2));
+        Assertions::assert('Cinco equipes geram dois confrontos e um bye na primeira fase', count($firstRound) === 3 && $matchCount === 2 && $byeCount === 1);
         Assertions::assertStatus('Mesário não pode recriar chaveamento coletivo', $mesario->postJson('api/v1/chaveamentos', ['id_modalidade' => $modality]), 403);
         $history = $admin->get("api/v1/chaveamentos?id_modalidade=$modality&acao=historico");
         $classification = $admin->get("api/v1/chaveamentos?id_modalidade=$modality&acao=classificacao");

@@ -20,7 +20,7 @@ if ($fotoUsuario) {
     $fotoPath = \App\Shared\Storage\StoragePaths::fotosUsuarios() . DIRECTORY_SEPARATOR . $fotoUsuario;
     if ($fotoUsuario === '' || !is_file($fotoPath)) $fotoUsuario = null;
 }
-$nomeUsuario = $_SESSION['nome'] ?? $usuarioPerfil['nome_usuario'] ?? 'Usuário';
+$nomeUsuario = $_SESSION['nome'] ?? $usuarioPerfil['nome_usuario'] ?? 'Estudante';
 $inicialNome = mb_strtoupper(mb_substr($nomeUsuario, 0, 1));
 
 // LISTA DE ITENS DO MENU

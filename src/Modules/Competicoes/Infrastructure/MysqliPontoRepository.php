@@ -300,7 +300,7 @@ final class MysqliPontoRepository implements PontoRepository
                 [$gameId, $teamId],
             );
             if ($row === null) {
-                throw new InvalidArgumentException('O placar só pode conter pontos vinculados a atletas inscritos e ativos.');
+                throw new InvalidArgumentException('O placar só pode conter pontos vinculados a estudantes inscritos e ativos.');
             }
             $partidaId = (int) $row['id_partida'];
             $activePoints = $this->queryRows(
@@ -312,7 +312,7 @@ final class MysqliPontoRepository implements PontoRepository
                 [$partidaId],
             );
             if ((int) $row['resultado_partida'] !== $expected || count($activePoints) !== $expected) {
-                throw new InvalidArgumentException('O placar só pode conter pontos vinculados a atletas inscritos e ativos.');
+                throw new InvalidArgumentException('O placar só pode conter pontos vinculados a estudantes inscritos e ativos.');
             }
         }
     }
@@ -344,7 +344,7 @@ final class MysqliPontoRepository implements PontoRepository
                 continue;
             }
             if ($teamId <= 0 || $userId <= 0 || $key === '' || strlen($key) < 12 || strlen($key) > 180) {
-                throw new InvalidArgumentException('Cada ponto offline precisa indicar equipe, atleta e identificação da jogada.');
+                throw new InvalidArgumentException('Cada ponto offline precisa indicar equipe, estudante e identificação da jogada.');
             }
             $existing = $this->buscarPorChave($key);
             if ($existing !== null) {
@@ -361,7 +361,7 @@ final class MysqliPontoRepository implements PontoRepository
             MysqliChaveamentoRepository::garantirPartidaEquipe($this->connection, $gameId, $teamId);
             $match = $this->one('SELECT id_partida FROM partidas WHERE jogos_id_jogo = ? AND equipes_id_equipe = ? LIMIT 1 FOR UPDATE', 'ii', [$gameId, $teamId]);
             if ($match === null || !$this->atletaElegivel($userId, $gameId, $teamId)) {
-                throw new InvalidArgumentException('O atleta não está inscrito e ativo nesta equipe para o jogo offline.');
+                throw new InvalidArgumentException('O estudante não está inscrito e ativo nesta equipe para o jogo offline.');
             }
             $anulado = (string) ($point['status_artilheiro'] ?? '') === 'anulado'
                 || (int) ($point['conta_no_placar'] ?? 1) !== 1;

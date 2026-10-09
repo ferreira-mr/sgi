@@ -85,7 +85,7 @@ test.describe('Autenticação, RBAC e Segurança de Rotas', () => {
         ]) {
             await page.goto(path, { waitUntil: 'domcontentloaded' });
             await expect(page).toHaveURL(/\/painel(?:\?|$)/);
-            await expect(page.locator('body')).not.toContainText('Alunos da turma');
+            await expect(page.locator('body')).not.toContainText('Estudantes da turma');
         }
     });
 

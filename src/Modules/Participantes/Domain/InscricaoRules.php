@@ -57,7 +57,7 @@ final class InscricaoRules
         $union = array_values(array_unique([...$already, ...$requested]));
         sort($union, SORT_NUMERIC);
         if (count($union) > $limit) {
-            throw new InvalidArgumentException('Máximo de ' . $limit . ' modalidades permitidas por aluno.');
+            throw new InvalidArgumentException('Máximo de ' . $limit . ' modalidades permitidas por estudante.');
         }
 
         return $union;

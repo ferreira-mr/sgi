@@ -69,6 +69,23 @@
         return Number(ordenadas[1].id_equipe);
     }
 
+    /* O placar e os IDs locais podem avançar a árvore, mas o snapshot online
+       continua sendo a fonte dos nomes exibidos. */
+    function projetarEquipeLocal(partida, referencia) {
+        partida = partida || {};
+        referencia = referencia || {};
+        return {
+            id_partida: partida.id_partida != null ? partida.id_partida : null,
+            id_equipe: Number(partida.equipes_id_equipe),
+            gols: Number(partida.resultado_partida) || 0,
+            id_turma: partida.id_turma != null ? Number(partida.id_turma) : (referencia.id_turma || null),
+            nome_turma: referencia.nome_turma || partida.nome_turma || '',
+            nome_fantasia: referencia.nome_fantasia || referencia.nome_fantasia_turma ||
+                partida.nome_fantasia_turma || partida.nome_fantasia || '',
+            nome_equipe: referencia.nome_equipe || partida.nome_equipe || ''
+        };
+    }
+
     /* ------------------------------ Estado interno ------------------------------ */
 
     // Último resultado entregue pela camada híbrida (para gatilhos de sync).
@@ -368,14 +385,14 @@
             return true;
         }
 
-        function garantirJogoPorTag(tag, metaRef) {
+        function garantirJogoPorTag(tag, metaRef, jogoOrigem) {
             if (mapaTag[tag]) return mapaTag[tag];
             contadorLocal -= 1;
             var pai = {
                 id_jogo: contadorLocal,                 // id temporário negativo (só existe localmente)
                 nome_jogo: tag,
                 status_jogo: 'Agendado',
-                data_jogo: null,
+                data_jogo: jogoOrigem && jogoOrigem.data_jogo ? jogoOrigem.data_jogo : null,
                 inicio_jogo: null,
                 termino_jogo: null,
                 modalidades_id_modalidade: defaultModId,
@@ -383,8 +400,9 @@
                 interclasses_id_interclasse: defaultInterclasseId,
                 nome_modalidade: defaultModNome,
                 tipos_modalidades_id_tipo_modalidade: defaultModTipo,
-                locais_id_local: null,
-                nome_local: null,
+                locais_id_local: jogoOrigem && jogoOrigem.locais_id_local ? jogoOrigem.locais_id_local : null,
+                nome_local: jogoOrigem && jogoOrigem.nome_local ? jogoOrigem.nome_local : null,
+                exige_horario_agendado: false,
                 duracao_jogo: defaultDuracao,
                 tempo_restante_jogo: defaultDuracao,
                 tempo_extra_jogo: 0,
@@ -411,10 +429,43 @@
             return true;
         }
 
+        function ramoTemEquipesAbaixo(largura, slot) {
+            return jogos.some(function (candidato) {
+                var meta = mmParse(candidato.nome_jogo);
+                if (!meta || meta.largura <= largura || meta.largura % largura !== 0 ||
+                    Math.floor(meta.slot / (meta.largura / largura)) !== slot) return false;
+                return (candidato.equipes || []).length > 0;
+            });
+        }
+
+        function byePendenteSemIrmao(largura) {
+            return jogos.find(function (candidato) {
+                var metaBye = mmParse(candidato.nome_jogo);
+                if (!metaBye || metaBye.largura !== largura || metaBye.kind !== 'B' ||
+                    !jogoEncerrado(candidato.status_jogo)) return false;
+                var irmao = mapaTag[mmTag(largura, slotIrmao(metaBye.slot), 'N')] ||
+                    mapaTag[mmTag(largura, slotIrmao(metaBye.slot), 'B')];
+                if (irmao) return false;
+                var pai = mapaTag[mmTag(proximaLargura(largura), slotPai(metaBye.slot), 'N')];
+                return !pai || (pai.equipes || []).length < 2;
+            });
+        }
+
+        function equipeJaAvancouPorByePendente(larguraPai, tagPaiEsperada, equipeId) {
+            return jogos.some(function (candidato) {
+                var meta = mmParse(candidato.nome_jogo);
+                return meta && meta.largura === larguraPai && meta.kind === 'N' &&
+                    candidato.nome_jogo !== tagPaiEsperada && (candidato.equipes || []).some(function (equipe) {
+                        return Number(equipe.id_equipe) === Number(equipeId);
+                    });
+            });
+        }
+
         /* Pai com um único competidor e ambos os lados resolvidos → conclui (bye implícito). */
         function tentarAutoConcluir(pai) {
             var meta = mmParse(pai.nome_jogo);
             if (!meta || jogoEncerrado(pai.status_jogo)) return false;
+            if (meta.largura === 2) return false;
             if ((pai.equipes || []).length !== 1) return false;
             if (!filhosResolvidos(meta.largura, meta.slot)) return false;
             pai.status_jogo = 'Concluido';
@@ -443,10 +494,71 @@
             var tagIrmaoB = mmTag(meta.largura, slotIrmao(meta.slot), 'B');
             var irmao = mapaTag[tagIrmaoA] || mapaTag[tagIrmaoB];
 
+            // Bye criado no último slot não possui irmão. Ele aguarda o
+            // primeiro vencedor desta fase e forma com ele a próxima partida.
+            if (meta.kind === 'N') {
+                var byePendente = byePendenteSemIrmao(meta.largura);
+                if (byePendente) {
+                    var metaBye = mmParse(byePendente.nome_jogo);
+                    var equipeBye = byePendente.equipes && byePendente.equipes[0];
+                    var vencedorBye = equipeBye ? Number(equipeBye.id_equipe) : null;
+                    if (metaBye && vencedorBye !== null) {
+                        var tagPaiBye = mmTag(proximaLargura(meta.largura), slotPai(metaBye.slot), 'N');
+                        var paiBye = garantirJogoPorTag(tagPaiBye, { largura: proximaLargura(meta.largura), slot: slotPai(metaBye.slot) }, jogo);
+                        if ((paiBye.equipes || []).length < 2 && jogoEncerrado(paiBye.status_jogo)) paiBye.status_jogo = 'Agendado';
+                        garantirEquipe(paiBye, vencedorBye, equipeBye);
+                        garantirEquipe(paiBye, w1, w1Obj);
+                        return;
+                    }
+                }
+                var tagPaiAtual = mmTag(proximaLargura(meta.largura), slotPai(meta.slot), 'N');
+                if (equipeJaAvancouPorByePendente(proximaLargura(meta.largura), tagPaiAtual, w1)) {
+                    // Reexecuções do motor não podem reutilizar a vencedora
+                    // que já está aguardando no confronto do bye inicial.
+                    return;
+                }
+            }
+
+            var irmaoJaAvancouPorBye = false;
+            if (irmao && jogoEncerrado(irmao.status_jogo)) {
+                var metaIrmaoExistente = mmParse(irmao.nome_jogo) || { kind: 'N' };
+                var vencedorIrmaoExistente = (metaIrmaoExistente.kind === 'B')
+                    ? ((irmao.equipes && irmao.equipes[0]) ? Number(irmao.equipes[0].id_equipe) : null)
+                    : vencedorDeEquipes(irmao.equipes);
+                var tagPaiEsperada = mmTag(proximaLargura(meta.largura), slotPai(meta.slot), 'N');
+                if (vencedorIrmaoExistente !== null && equipeJaAvancouPorByePendente(proximaLargura(meta.largura), tagPaiEsperada, vencedorIrmaoExistente)) {
+                    irmao = null;
+                    irmaoJaAvancouPorBye = true;
+                }
+            }
+
             if (irmao && !jogoEncerrado(irmao.status_jogo)) return;
+            // Um slot sem jogo só é vazio se não houver participantes ainda
+            // avançando em rodadas inferiores. Aguarde esse ramo para não
+            // criar uma final prematura com apenas uma equipe.
+            if (!irmao && ramoTemEquipesAbaixo(meta.largura, slotIrmao(meta.slot))) return;
 
             var tagPai = mmTag(proximaLargura(meta.largura), slotPai(meta.slot), 'N');
-            var pai = garantirJogoPorTag(tagPai, { largura: proximaLargura(meta.largura), slot: slotPai(meta.slot) });
+            var pai = garantirJogoPorTag(tagPai, { largura: proximaLargura(meta.largura), slot: slotPai(meta.slot) }, jogo);
+            // Esta é uma projeção exclusivamente local: depois que os dois
+            // vencedores chegam ao confronto, o mesário pode iniciá-lo sem
+            // depender de uma reserva de agenda que só poderia ser validada
+            // pelo servidor. A sobreposição é removida ao sincronizar.
+            pai._offline_liberado = true;
+            pai.exige_horario_agendado = false;
+            if (irmaoJaAvancouPorBye && (pai.equipes || []).length > 1) {
+                jogos.forEach(function (posterior) {
+                    var metaPosterior = mmParse(posterior.nome_jogo);
+                    if (metaPosterior && metaPosterior.largura < proximaLargura(meta.largura)) {
+                        posterior.equipes = [];
+                        posterior.status_jogo = 'Agendado';
+                    }
+                });
+                pai.equipes = (pai.equipes || []).filter(function (equipe) {
+                    return Number(equipe.id_equipe) === Number(w1);
+                });
+                pai.status_jogo = 'Agendado';
+            }
             garantirEquipe(pai, w1, w1Obj);
 
             if (!irmao) {
@@ -522,7 +634,8 @@
             var meta = mmParse(jogo.nome_jogo);
             var faseNivel = meta ? meta.largura : null;
             var slot = meta ? meta.slot : null;
-            var ehBye = !!meta && meta.kind === 'B';
+            var ehBye = !!meta && (meta.kind === 'B' ||
+                ((jogo.equipes || []).length === 1 && jogoEncerrado(jogo.status_jogo)));
             var ehDisputaPosicao = !!meta && meta.posicao !== undefined;
 
             var proximoId = null;
@@ -690,15 +803,10 @@
                         });
                         if (partidasLocaisDoJogo.length) {
                             cloneLocal.equipes = partidasLocaisDoJogo.map(function (p) {
-                                return {
-                                    id_partida: p.id_partida != null ? p.id_partida : null,
-                                    id_equipe: Number(p.equipes_id_equipe),
-                                    gols: Number(p.resultado_partida) || 0,
-                                    id_turma: p.id_turma != null ? Number(p.id_turma) : null,
-                                    nome_turma: p.nome_turma || '',
-                                    nome_fantasia: p.nome_fantasia_turma || p.nome_fantasia || '',
-                                    nome_equipe: p.nome_equipe || ''
-                                };
+                                var referencia = (existente.equipes || []).filter(function (e) {
+                                    return Number(e.id_equipe) === Number(p.equipes_id_equipe);
+                                })[0];
+                                return projetarEquipeLocal(p, referencia);
                             });
                         }
                         jogosBase[jogosBase.indexOf(existente)] = cloneLocal;
@@ -706,20 +814,19 @@
                     }
                     if (existente) {
                         existente.status_jogo = local.status_jogo || existente.status_jogo;
+                        if (local._offline_liberado === true) {
+                            existente._offline_liberado = true;
+                            existente.exige_horario_agendado = false;
+                        }
                         var psExistente = partidasLocais.filter(function (p) {
                             return String(p.jogos_id_jogo) === String(local.id_jogo);
                         });
                         if (psExistente.length) {
                             existente.equipes = psExistente.map(function (p) {
-                                return {
-                                    id_partida: p.id_partida != null ? p.id_partida : null,
-                                    id_equipe: Number(p.equipes_id_equipe),
-                                    gols: Number(p.resultado_partida) || 0,
-                                    id_turma: p.id_turma != null ? Number(p.id_turma) : null,
-                                    nome_turma: p.nome_turma || '',
-                                    nome_fantasia: p.nome_fantasia_turma || p.nome_fantasia || '',
-                                    nome_equipe: p.nome_equipe || ''
-                                };
+                                var referencia = (existente.equipes || []).filter(function (e) {
+                                    return Number(e.id_equipe) === Number(p.equipes_id_equipe);
+                                })[0];
+                                return projetarEquipeLocal(p, referencia);
                             });
                         }
                         return;
@@ -731,17 +838,7 @@
                             return String(p.jogos_id_jogo) === String(local.id_jogo);
                         });
                         if (ps.length) {
-                            clone.equipes = ps.map(function (p) {
-                                return {
-                                    id_partida: p.id_partida != null ? p.id_partida : null,
-                                    id_equipe: Number(p.equipes_id_equipe),
-                                    gols: Number(p.resultado_partida) || 0,
-                                    id_turma: p.id_turma != null ? Number(p.id_turma) : null,
-                                    nome_turma: p.nome_turma || '',
-                                    nome_fantasia: p.nome_fantasia_turma || '',
-                                    nome_equipe: p.nome_equipe || ''
-                                };
-                            });
+                            clone.equipes = ps.map(function (p) { return projetarEquipeLocal(p); });
                         }
                         jogosBase.push(clone);
                     }
@@ -924,16 +1021,10 @@
                     if (!ps.length) return;
                     b.equipes = ps.map(function (p) {
                         var idEq = Number(p.equipes_id_equipe);
-                        var info = dirEquipes[idEq] || {};
-                        return {
-                            id_partida: p.id_partida != null ? p.id_partida : null,
-                            id_equipe: idEq,
-                            gols: Number(p.resultado_partida) || 0,
-                            id_turma: p.id_turma || info.id_turma || null,
-                            nome_turma: p.nome_turma || info.nome_turma || '',
-                            nome_fantasia: p.nome_fantasia_turma || p.nome_fantasia || info.nome_fantasia || p.nome_equipe || info.nome_equipe || '',
-                            nome_equipe: p.nome_equipe || info.nome_equipe || ''
-                        };
+                        var referencia = (b.equipes || []).filter(function (e) {
+                            return Number(e.id_equipe) === idEq;
+                        })[0] || dirEquipes[idEq] || {};
+                        return projetarEquipeLocal(p, referencia);
                     });
                 });
 
@@ -980,11 +1071,13 @@
                         return Number(j.id_jogo) === Number(b.id_jogo);
                     })[0];
 
-                    if (Number(b.id_jogo) < 0) {
+                    if (Number(b.id_jogo) < 0 || b._offline_liberado === true) {
                         // Partida derivada offline: SEMPRE garante o jogo e TODAS as suas equipes em 'partidas'
                         var rowJogo = JSON.parse(JSON.stringify(b));
                         rowJogo._local = true;
                         rowJogo._pendente = true;
+                        rowJogo._offline_liberado = true;
+                        rowJogo.exige_horario_agendado = false;
                         // A agenda renderiza o confronto pelo resumo textual,
                         // enquanto o placar usa as linhas de `partidas`.
                         // Persistir ambos mantém as duas telas coerentes.

@@ -37,7 +37,7 @@ final class ImportacaoTurmaController
             return Response::json(['success' => false, 'message' => $exception->getMessage()], 400);
         } catch (\Throwable $exception) {
             error_log('Falha ao importar PDF da turma: ' . $exception->getMessage());
-            return Response::json(['success' => false, 'message' => 'Não foi possível importar os alunos.'], 500);
+            return Response::json(['success' => false, 'message' => 'Não foi possível importar os estudantes.'], 500);
         } finally {
             while (ob_get_level() > $outputBufferLevel) {
                 ob_end_clean();

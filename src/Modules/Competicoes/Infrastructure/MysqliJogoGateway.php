@@ -31,8 +31,19 @@ final class MysqliJogoGateway
         // consulta e confirmação da sincronização. Preserve o filtro somente
         // quando a chamada não está apontando para um jogo individual.
         $operational = !empty($filters['operacional']) && (int) ($filters['id_jogo'] ?? 0) <= 0
-            ? " AND jogos.data_jogo IS NOT NULL AND jogos.inicio_jogo IS NOT NULL
-                AND jogos.termino_jogo IS NOT NULL AND jogos.locais_id_local IS NOT NULL
+            ? " AND jogos.data_jogo IS NOT NULL AND jogos.locais_id_local IS NOT NULL
+                AND (
+                    (jogos.inicio_jogo IS NOT NULL AND jogos.termino_jogo IS NOT NULL)
+                    OR (
+                        jogos.nome_jogo LIKE 'MM:%'
+                        AND CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(jogos.nome_jogo, ':', 2), ':', -1) AS UNSIGNED) < (
+                            SELECT MAX(CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(fase_operacional.nome_jogo, ':', 2), ':', -1) AS UNSIGNED))
+                            FROM jogos fase_operacional
+                            WHERE fase_operacional.modalidades_id_modalidade = jogos.modalidades_id_modalidade
+                              AND fase_operacional.nome_jogo LIKE 'MM:%'
+                        )
+                    )
+                )
                 AND jogos.status_jogo IN ('Agendado', 'Iniciado', 'Pausado')"
             : '';
         $sql = "SELECT jogos.id_jogo, jogos.nome_jogo, jogos.data_jogo,
@@ -40,6 +51,13 @@ final class MysqliJogoGateway
                        jogos.tempo_restante_jogo, jogos.duracao_jogo,
                        jogos.tempo_extra_jogo, jogos.data_inicio_real,
                        UNIX_TIMESTAMP(jogos.data_inicio_real) AS data_inicio_epoch,
+                       CASE WHEN jogos.nome_jogo LIKE 'MM:%'
+                             AND CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(jogos.nome_jogo, ':', 2), ':', -1) AS UNSIGNED) < (
+                                 SELECT MAX(CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(fase.nome_jogo, ':', 2), ':', -1) AS UNSIGNED))
+                                 FROM jogos fase
+                                 WHERE fase.modalidades_id_modalidade = jogos.modalidades_id_modalidade
+                                   AND fase.nome_jogo LIKE 'MM:%'
+                             ) THEN 0 ELSE 1 END AS exige_horario_agendado,
                        jogos.modalidades_id_modalidade, jogos.locais_id_local,
                        modalidades.nome_modalidade,
                        modalidades.interclasses_id_interclasse AS id_interclasse,
@@ -96,6 +114,7 @@ final class MysqliJogoGateway
                 ], $now);
             }
             $row['servidor_epoch_ms'] = $now * 1000;
+            $row['exige_horario_agendado'] = (bool) $row['exige_horario_agendado'];
             $row['tipo_competicao'] = \App\Modules\Competicoes\Domain\TipoCompeticaoRules::resolve($row);
             unset($row['data_inicio_epoch']);
         }

@@ -125,7 +125,7 @@ final class UsuarioController
                     return Response::json(EdicaoRules::erroSemInterclasseAtivo());
                 }
                 $this->usuarios->editarAluno($data, $edition);
-                return Response::json(['status' => 'sucesso', 'mensagem' => 'Aluno atualizado!']);
+                return Response::json(['status' => 'sucesso', 'mensagem' => 'Estudante atualizado!']);
             }
             if (in_array($action, ['excluir_aluno', 'resetar_senha_aluno', 'excluir_colaborador'], true)) {
                 if (($denied = AccessGuard::authorize([0])) !== null) {
@@ -134,13 +134,13 @@ final class UsuarioController
                 $id = (int) ($data['id_usuario'] ?? 0);
                 if ($action === 'excluir_aluno') {
                     $this->administrative->excluirAluno($id);
-                    return Response::json(['status' => 'sucesso', 'mensagem' => 'Aluno removido.']);
+                    return Response::json(['status' => 'sucesso', 'mensagem' => 'Estudante removido.']);
                 }
                 if ($action === 'resetar_senha_aluno') {
                     $temporaryPassword = $this->administrative->resetarSenhaAluno($id);
                     return Response::json([
                         'status' => 'sucesso',
-                        'mensagem' => 'Senha redefinida para sesi-senai. O aluno deverá trocá-la no próximo acesso.',
+                        'mensagem' => 'Senha redefinida para sesi-senai. O estudante deverá trocá-la no próximo acesso.',
                         'senha_temporaria' => $temporaryPassword,
                     ]);
                 }
@@ -160,7 +160,7 @@ final class UsuarioController
                     return Response::json(['status' => 'erro', 'mensagem' => 'Edição não autorizada.'], 403);
                 }
                 $this->usuarios->atribuirAluno((int) $request->query('id'), (int) ($data['turmas_id_turma'] ?? 0), $edition);
-                return Response::json(['status' => 'sucesso', 'mensagem' => 'Aluno atualizado.']);
+                return Response::json(['status' => 'sucesso', 'mensagem' => 'Estudante atualizado.']);
             }
             return Response::json(['status' => 'erro', 'mensagem' => 'Ação inválida.'], 400);
         } catch (\mysqli_sql_exception $exception) {

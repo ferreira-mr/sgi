@@ -401,4 +401,48 @@ final class MysqliPodioRepository implements PodioRepository
             || in_array($position, [1, 2], true) && (int) $meta['largura'] === 2 && !isset($meta['posicao']);
     }
 
+    /** @return array<int, int> */
+    public function pontosPadraoEdicao(int $editionId): array
+    {
+        $statement = $this->connection->prepare(
+            'SELECT ponto_1_lugar, ponto_2_lugar, ponto_3_lugar FROM interclasses WHERE id_interclasse = ? LIMIT 1',
+        );
+        if ($statement === false) {
+            return [1 => 10, 2 => 7, 3 => 5];
+        }
+        $statement->bind_param('i', $editionId);
+        $statement->execute();
+        $row = $statement->get_result()->fetch_assoc();
+        $statement->close();
+        if ($row === null) {
+            return [1 => 10, 2 => 7, 3 => 5];
+        }
+        return [
+            1 => (int) $row['ponto_1_lugar'],
+            2 => (int) $row['ponto_2_lugar'],
+            3 => (int) $row['ponto_3_lugar'],
+        ];
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function carregarPodioModalidade(int $editionId, int $modalityId): array
+    {
+        $statement = $this->connection->prepare(
+            'SELECT p.id_pontuacao, p.posicao, p.id_turma, p.id_equipe, p.id_usuario, p.pontos, p.ativo,
+                    t.nome_turma, t.nome_fantasia_turma, e.nome_equipe
+             FROM pontuacoes_podio p
+             INNER JOIN turmas t ON t.id_turma = p.id_turma
+             LEFT JOIN equipes e ON e.id_equipe = p.id_equipe
+             WHERE p.id_interclasse = ? AND p.id_modalidade = ? AND p.ativo = 1
+             ORDER BY p.posicao ASC',
+        );
+        if ($statement === false) {
+            return [];
+        }
+        $statement->bind_param('ii', $editionId, $modalityId);
+        $statement->execute();
+        $rows = $statement->get_result()->fetch_all(MYSQLI_ASSOC);
+        $statement->close();
+        return $rows;
+    }
 }

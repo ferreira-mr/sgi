@@ -130,6 +130,36 @@ test('administrador e colaborador continuam vendo opção de editar jogo no card
     assert.match(htmlColab, /Editar/);
 });
 
+test('fase posterior herdada permite iniciar sem horário', () => {
+    const mesario = carregarChaveamento({ value3: 2, podeEditar: false });
+    const jogo = { ...JOGO_AGENDADO, id_jogo: 104, inicio_jogo: null, termino_jogo: null, exige_horario_agendado: false };
+
+    const html = mesario._renderBracketMatch(jogo);
+
+    assert.match(html, /href="\/jogos\/placar\?id_jogo=104"/);
+    assert.match(html, /Iniciar/);
+});
+
+test('fase formada offline permite iniciar sem agenda e mantém o nome da equipe online', () => {
+    const mesario = carregarChaveamento({ value3: 2, podeEditar: false });
+    const jogo = {
+        ...JOGO_SEM_DATA,
+        id_jogo: -104,
+        _offline_liberado: true,
+        exige_horario_agendado: false,
+        equipes: [
+            { id_equipe: 1, nome_equipe: 'Equipe de Vôlei', nome_turma: '3º Ano A', gols: 0 },
+            { id_equipe: 2, nome_equipe: 'Equipe de Vôlei', nome_turma: '1º Ano B', gols: 0 },
+        ],
+    };
+
+    const html = mesario._renderBracketMatch(jogo);
+
+    assert.match(html, /href="\/jogos\/placar\?id_jogo=-104"/);
+    assert.match(html, /Iniciar/);
+    assert.match(html, /Equipe de Vôlei/);
+});
+
 test('aluno não pode editar jogos no chaveamento', () => {
     const aluno = carregarChaveamento({ value3: 3, podeEditar: false });
     assert.equal(aluno.podeEditarJogo(), false);

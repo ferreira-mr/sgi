@@ -84,6 +84,26 @@
 
     scheduleContentTargetUpdate();
 
+    function installMesarioRefreshGuard() {
+        if (Number(global.SGI_SESSION_NIVEL) !== 2 || !document.addEventListener) return;
+        var noticeVisible = false;
+        document.addEventListener('keydown', function (event) {
+            var isRefreshShortcut = event.key === 'F5'
+                || ((event.ctrlKey || event.metaKey) && String(event.key).toLowerCase() === 'r');
+            if (!isRefreshShortcut) return;
+            event.preventDefault();
+            event.stopPropagation();
+            if (noticeVisible) return;
+            noticeVisible = true;
+            if (global.SGI && typeof global.SGI.showToast === 'function') {
+                global.SGI.showToast('Ops, mesário! Para manter o placar seguro, não atualize esta página. Continue por aqui 💙', 'info', { delay: 5000 });
+            }
+            global.setTimeout(function () { noticeVisible = false; }, 5000);
+        }, true);
+    }
+
+    installMesarioRefreshGuard();
+
     function createScope() {
         var listeners = new WeakMap();
         var globalListeners = [];
@@ -195,6 +215,7 @@
     global.SGIPage = {
         ready: ready, mount: mount, prepareModal: prepareModal,
         updateContentTarget: updateContentTarget,
+        installMesarioRefreshGuard: installMesarioRefreshGuard,
         focusPageHeading: focusPageHeading,
         deactivate: function () { if (activeScope) activeScope.deactivate(); activeScope = null; }
     };

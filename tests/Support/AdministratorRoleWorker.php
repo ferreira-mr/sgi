@@ -26,7 +26,10 @@ if ($barrier === '' || $workerId === '' || $userId <= 0 || $editionId <= 0) {
     exit(1);
 }
 
-if (@file_put_contents($barrier . DIRECTORY_SEPARATOR . 'ready-' . $workerId, 'ready', LOCK_EX) === false) {
+$readyPath = $barrier . DIRECTORY_SEPARATOR . 'ready-' . $workerId;
+$tmpReady = $readyPath . '.tmp.' . getmypid() . '.' . bin2hex(random_bytes(4));
+if (@file_put_contents($tmpReady, 'ready', LOCK_EX) === false || !@rename($tmpReady, $readyPath)) {
+    @unlink($tmpReady);
     fwrite(STDERR, 'Não foi possível anunciar o worker de papel.');
     exit(1);
 }

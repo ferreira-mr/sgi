@@ -47,15 +47,25 @@ window.SGIPage.mount("aluno/ranking", function (pageConfig, pageScope) {
                 }
                 const lista = Array.isArray(data) ? data : [data];
 
-                const encerrado = lista.find(i => String(i.status_interclasse) === '0');
-                if (encerrado) {
-                    idInterclasse = encerrado.id_interclasse;
-                    const url = new URL(window.location);
-                    url.searchParams.set('id', idInterclasse);
-                    window.history.replaceState({}, '', url);
+                if (IS_ADMIN) {
+                    const ativaOuEncerrada = lista.find(i => String(i.status_interclasse) === '1') || lista.find(i => String(i.status_interclasse) === '0');
+                    if (ativaOuEncerrada) {
+                        idInterclasse = ativaOuEncerrada.id_interclasse;
+                        const url = new URL(window.location);
+                        url.searchParams.set('id', idInterclasse);
+                        window.history.replaceState({}, '', url);
+                    }
+                } else {
+                    const encerrado = lista.find(i => String(i.status_interclasse) === '0');
+                    if (encerrado) {
+                        idInterclasse = encerrado.id_interclasse;
+                        const url = new URL(window.location);
+                        url.searchParams.set('id', idInterclasse);
+                        window.history.replaceState({}, '', url);
+                    }
                 }
             } catch (e) {
-                console.error("Erro ao carregar interclasse ativo:", e);
+                console.error("Erro ao carregar interclasse:", e);
                 exibirMensagem("Não foi possível buscar o interclasse. Tente novamente.", "danger", true);
                 return;
             } finally {
@@ -64,7 +74,7 @@ window.SGIPage.mount("aluno/ranking", function (pageConfig, pageScope) {
         }
 
         if (!idInterclasse) {
-            exibirMensagem("Nenhum interclasse encerrado possui ranking disponível.", "warning");
+            exibirMensagem(IS_ADMIN ? "Nenhum interclasse encontrado." : "Nenhum interclasse encerrado possui ranking disponível.", "warning");
             return;
         }
         await carregarDados();
@@ -374,6 +384,37 @@ window.SGIPage.mount("aluno/ranking", function (pageConfig, pageScope) {
                 if (event.target.closest('[data-sgi-action="retry-ranking"]')) tentarNovamente();
             });
         });
+
+        const btnRecMob = document.getElementById('btnReconciliarRankingMob');
+        if (btnRecMob) pageScope.listen(btnRecMob, 'click', reconciliarRanking);
+        const btnRecDesk = document.getElementById('btnReconciliarRankingDesk');
+        if (btnRecDesk) pageScope.listen(btnRecDesk, 'click', reconciliarRanking);
+    }
+
+    async function reconciliarRanking() {
+        if (!idInterclasse) return;
+        const confirmou = await SGI.confirm({
+            titulo: 'Recalcular Ranking?',
+            mensagem: 'Isso recalculará a pontuação bruta de todas as turmas da edição com base nos pódios ativos e arrecadações registradas.',
+            textoConfirmar: 'Recalcular'
+        });
+        if (!confirmou) return;
+
+        try {
+            const res = await fetch(`${API_BASE}ranking`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id_interclasse: parseInt(idInterclasse, 10), acao: 'reconciliar' })
+            });
+            const data = await lerRespostaJson(res, 'Reconciliação de ranking');
+            if (!res.ok || (data && data.success === false)) {
+                throw new Error((data && data.message) || 'Falha ao recalcular ranking.');
+            }
+            SGI.alert(data.message || 'Ranking recalculado com sucesso!');
+            await carregarDados();
+        } catch (e) {
+            SGI.alert(e.message || 'Erro ao recalcular ranking.');
+        }
     }
 
     function fmtData(s) {

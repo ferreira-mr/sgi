@@ -71,6 +71,10 @@ final class CronometroService
             return ['snapshot' => $this->persistedSnapshot($state), 'agora' => $agora];
         }
 
+        if ($requestedStatus === 'Iniciado' && $state['status_jogo'] === 'Agendado') {
+            $this->assertInitialSchedule($state);
+        }
+
         $state = $this->prepararEstadoInicial($state, $data);
         $hasSnapshot = array_key_exists('cronometro', $data);
         $snapshot = $hasSnapshot
@@ -162,19 +166,26 @@ final class CronometroService
         if (!is_string($data['status_jogo']) || trim($data['status_jogo']) === '') {
             throw new InvalidArgumentException('Status de cronômetro inválido.');
         }
-        if ($data['status_jogo'] === 'Iniciado' && $state['status_jogo'] === 'Agendado') {
-            foreach (['data_jogo', 'inicio_jogo', 'termino_jogo', 'locais_id_local'] as $field) {
-                if (!array_key_exists($field, $state) || $state[$field] === null || $state[$field] === '') {
-                    throw new InvalidArgumentException('O jogo precisa ter data, horário e local definidos antes de iniciar.');
-                }
-            }
-        }
         return match ($data['status_jogo']) {
             'Iniciado' => CronometroRules::transicionar($state, 'retomar', $agora),
             'Pausado' => CronometroRules::transicionar($state, 'pausar', $agora),
             'Agendado' => $this->keepScheduled($state, $agora),
             default => throw new InvalidArgumentException('Status de cronômetro inválido.'),
         };
+    }
+
+    /** @param array<string,mixed> $state */
+    private function assertInitialSchedule(array $state): void
+    {
+        $requiresTime = ($state['exige_horario_agendado'] ?? true) === true;
+        $requiredScheduleFields = $requiresTime
+            ? ['data_jogo', 'locais_id_local', 'inicio_jogo', 'termino_jogo']
+            : ['data_jogo', 'locais_id_local'];
+        foreach ($requiredScheduleFields as $field) {
+            if (!array_key_exists($field, $state) || $state[$field] === null || $state[$field] === '') {
+                throw new InvalidArgumentException('O jogo precisa ter data, local' . ($requiresTime ? ' e horário' : '') . ' definidos antes de iniciar.');
+            }
+        }
     }
 
     /**

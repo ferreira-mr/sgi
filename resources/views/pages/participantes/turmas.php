@@ -88,10 +88,10 @@ $paginaAtiva = 'categorias';
                     </div>
                     <div class="mb-3 d-flex align-items-center gap-2 flex-column">
                         <input type="file" id="arquivoUpload" class="d-none" accept=".pdf" onchange="mostrarNomeArquivo()">
-                        <p class="small">Adicione aqui o pdf dos alunos da turma criada</p>
+                        <p class="small">Adicione aqui o PDF dos estudantes da turma criada</p>
 
                         <label for="arquivoUpload" class="btn btn-outline-primary">
-                            <i class="bi bi-upload" aria-hidden="true"></i> Selecionar PDF dos alunos
+                            <i class="bi bi-upload" aria-hidden="true"></i> Selecionar PDF dos estudantes
                         </label>
 
                         <span id="nomeArquivo" class="text-muted"></span>

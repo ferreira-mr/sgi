@@ -78,7 +78,7 @@ final class EquipeController
                 return Response::json(['success' => true, 'message' => 'Usuários vinculados à equipe com sucesso!']);
             case 'remover_aluno':
                 $this->service->removerUsuario((int) ($data['id_equipe'] ?? 0), (int) ($data['id_usuario'] ?? 0));
-                return Response::json(['success' => true, 'message' => 'Aluno removido da equipe com sucesso!']);
+                return Response::json(['success' => true, 'message' => 'Estudante removido da equipe com sucesso!']);
             case 'redistribuir':
                 $modality = (int) ($data['modalidades_id_modalidade'] ?? 0);
                 $class = (int) ($data['turmas_id_turma'] ?? 0);

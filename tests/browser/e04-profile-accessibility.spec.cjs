@@ -386,7 +386,7 @@ test.describe('E04 primeiro acesso e perfil do aluno', () => {
         await ensureStudentReady(page, aluno);
         await page.goto('aluno/perfil', { waitUntil: 'domcontentloaded' });
         await expect(page.locator('main:visible')).toContainText(aluno.matricula);
-        await expect(page.locator('main:visible')).toContainText('Aluno');
+        await expect(page.locator('main:visible')).toContainText('Estudante');
         await expect(page.getByText('E-mail', { exact: true })).toHaveCount(0);
         await expect(page.getByText('Online', { exact: true })).toHaveCount(0);
         await expect(page.getByText('Senha criptografada', { exact: true })).toHaveCount(0);

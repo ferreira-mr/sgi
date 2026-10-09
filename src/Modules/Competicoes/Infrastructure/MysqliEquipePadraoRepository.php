@@ -337,12 +337,12 @@ final class MysqliEquipePadraoRepository
          WHERE eu.equipes_id_equipe = ? AND u.status_usuario = \'1\'
          ORDER BY eu.usuarios_id_usuario ASC');
         if (!$stmt) {
-            throw new \RuntimeException('Não foi possível consultar os alunos da equipe padrão.');
+            throw new \RuntimeException('Não foi possível consultar os estudantes da equipe padrão.');
         }
         $stmt->bind_param('i', $idEquipePadrao);
         if (!$stmt->execute()) {
             $stmt->close();
-            throw new \RuntimeException('Não foi possível consultar os alunos da equipe padrão.');
+            throw new \RuntimeException('Não foi possível consultar os estudantes da equipe padrão.');
         }
         $res = $stmt->get_result();
         $alunos = [];
@@ -352,7 +352,7 @@ final class MysqliEquipePadraoRepository
         $stmt->close();
         $total = \count($alunos);
         if ($total <= $limite) {
-            return ['success' => \true, 'message' => 'Nenhum aluno excedente para redistribuir.', 'modalidades_id_modalidade' => $idModalidade, 'turmas_id_turma' => $idTurma, 'total_alunos' => $total, 'limite_maximo' => $limite, 'redistribuidos' => 0, 'nao_redistribuidos' => 0, 'excedeu_limite' => \false];
+            return ['success' => \true, 'message' => 'Nenhum estudante excedente para redistribuir.', 'modalidades_id_modalidade' => $idModalidade, 'turmas_id_turma' => $idTurma, 'total_alunos' => $total, 'limite_maximo' => $limite, 'redistribuidos' => 0, 'nao_redistribuidos' => 0, 'excedeu_limite' => \false];
         }
         $excedentes = \array_slice($alunos, $limite);
         \shuffle($excedentes);
@@ -362,7 +362,7 @@ final class MysqliEquipePadraoRepository
             $sqlRemover = $conn->prepare('DELETE FROM equipes_has_usuarios WHERE equipes_id_equipe = ? AND usuarios_id_usuario = ?');
             $sqlInserir = $conn->prepare('INSERT IGNORE INTO equipes_has_usuarios (equipes_id_equipe, usuarios_id_usuario) VALUES (?, ?)');
             if (!$sqlRemover || !$sqlInserir) {
-                throw new \RuntimeException('Não foi possível preparar a redistribuição dos alunos.');
+                throw new \RuntimeException('Não foi possível preparar a redistribuição dos estudantes.');
             }
             $redistribuidos = 0;
             $naoRedistribuidos = 0;
@@ -374,12 +374,12 @@ final class MysqliEquipePadraoRepository
                 }
                 $sqlInserir->bind_param('ii', $alvo, $idUsuario);
                 if (!$sqlInserir->execute()) {
-                    throw new \RuntimeException('Não foi possível inserir um aluno na equipe de destino.');
+                    throw new \RuntimeException('Não foi possível inserir um estudante na equipe de destino.');
                 }
                 if ($sqlInserir->affected_rows === 1) {
                     $sqlRemover->bind_param('ii', $idEquipePadrao, $idUsuario);
                     if (!$sqlRemover->execute()) {
-                        throw new \RuntimeException('Não foi possível retirar um aluno da equipe padrão.');
+                        throw new \RuntimeException('Não foi possível retirar um estudante da equipe padrão.');
                     }
                     $redistribuidos++;
                 } else {
@@ -393,7 +393,7 @@ final class MysqliEquipePadraoRepository
             if ($redistribuidos === 0 && $naoRedistribuidos > 0) {
                 return [
                     'success' => \false,
-                    'message' => 'Não há vagas disponíveis em equipes secundárias para redistribuir os alunos excedentes.',
+                    'message' => 'Não há vagas disponíveis em equipes secundárias para redistribuir os estudantes excedentes.',
                     'modalidades_id_modalidade' => $idModalidade,
                     'turmas_id_turma' => $idTurma,
                     'total_alunos' => $totalFinal,
@@ -403,7 +403,7 @@ final class MysqliEquipePadraoRepository
                     'excedeu_limite' => $totalFinal > $limite,
                 ];
             }
-            return ['success' => \true, 'message' => $redistribuidos > 0 ? $redistribuidos . ' aluno(s) redistribuído(s) para equipe(s) secundária(s).' : 'Nenhum aluno pôde ser redistribuído.', 'modalidades_id_modalidade' => $idModalidade, 'turmas_id_turma' => $idTurma, 'total_alunos' => $totalFinal, 'limite_maximo' => $limite, 'redistribuidos' => $redistribuidos, 'nao_redistribuidos' => $naoRedistribuidos, 'excedeu_limite' => $totalFinal > $limite];
+            return ['success' => \true, 'message' => $redistribuidos > 0 ? $redistribuidos . ' estudante(s) redistribuído(s) para equipe(s) secundária(s).' : 'Nenhum estudante pôde ser redistribuído.', 'modalidades_id_modalidade' => $idModalidade, 'turmas_id_turma' => $idTurma, 'total_alunos' => $totalFinal, 'limite_maximo' => $limite, 'redistribuidos' => $redistribuidos, 'nao_redistribuidos' => $naoRedistribuidos, 'excedeu_limite' => $totalFinal > $limite];
         } catch (\Throwable $e) {
             $conn->rollback();
             throw $e;

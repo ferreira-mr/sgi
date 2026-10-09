@@ -182,19 +182,19 @@ test.describe('E03 — formulários, modais e controles de equipe', () => {
             waitUntil: 'domcontentloaded',
         });
         await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
-        await expect(page.getByRole('heading', { level: 1 })).toHaveText('Adicionar alunos à equipe');
+        await expect(page.getByRole('heading', { level: 1 })).toHaveText('Adicionar estudantes à equipe');
         const novoAluno = page.getByRole('checkbox', { name: 'Adicionar Ana Pereira, matrícula E03-9902 à equipe' });
         const membroExistente = page.getByRole('checkbox', { name: 'Bia Lima, matrícula E03-9903, já vinculado à equipe' });
         await expect(novoAluno).toBeVisible();
         await expect(membroExistente).toBeDisabled();
         await expect(membroExistente).toBeChecked();
-        await expect(page.getByRole('button', { name: 'Salvar alunos selecionados na equipe' })).toBeVisible();
+        await expect(page.getByRole('button', { name: /Salvar estudantes selecionados na equipe/ })).toBeVisible();
 
         await novoAluno.check();
         await expect(novoAluno).toBeChecked();
         await page.setViewportSize({ width: 390, height: 844 });
         await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
-        await expect(page.getByRole('heading', { level: 1 })).toHaveText('Adicionar alunos à equipe');
+        await expect(page.getByRole('heading', { level: 1 })).toHaveText('Adicionar estudantes à equipe');
         const novoAlunoMobile = page.getByRole('checkbox', { name: 'Adicionar Ana Pereira, matrícula E03-9902 à equipe' });
         await expect(novoAlunoMobile).toBeChecked();
         await novoAlunoMobile.uncheck();
@@ -214,7 +214,7 @@ test.describe('E03 — formulários, modais e controles de equipe', () => {
         await expect(modalNovaTurma.getByLabel('Nome fantasia:')).toBeVisible();
         await expect(modalNovaTurma.getByLabel('Turno:')).toBeVisible();
         await expect(modalNovaTurma.getByLabel('Categoria:')).toBeVisible();
-        await expect(modalNovaTurma.locator('label[for="arquivoUpload"]')).toHaveText('Selecionar PDF dos alunos');
+        await expect(modalNovaTurma.locator('label[for="arquivoUpload"]')).toHaveText('Selecionar PDF dos estudantes');
         await fecharComEscape(page, modalNovaTurma, { restaurarFoco: true, acionador: abrirNovaTurma });
         await expect(page.locator('.modal-backdrop')).toHaveCount(0);
 
@@ -235,29 +235,29 @@ test.describe('E03 — formulários, modais e controles de equipe', () => {
 
         await page.goto('turmas/alunos?id=901&id_turma=902&id_categoria=903', { waitUntil: 'domcontentloaded' });
         await expect(page.locator('#tbodyAlunosTurmaDesk tr')).toHaveCount(2);
-        await expect(page.locator('main.d-none.d-md-block').getByLabel('Buscar aluno por nome ou RM')).toBeVisible();
-        await expect(page.locator('main.d-md-none').getByLabel('Buscar aluno por nome ou RM')).toHaveCount(1);
+        await expect(page.locator('main.d-none.d-md-block').getByLabel('Buscar estudante por nome ou RM')).toBeVisible();
+        await expect(page.locator('main.d-md-none').getByLabel('Buscar estudante por nome ou RM')).toHaveCount(1);
         for (const sufixo of ['Mob', 'Desk']) {
-            await expect(page.locator(`label[for="pdfInput${sufixo}"]`)).toHaveText('Selecionar PDF com a lista de alunos para esta turma');
+            await expect(page.locator(`label[for="pdfInput${sufixo}"]`)).toHaveText('Selecionar PDF com a lista de estudantes para esta turma');
         }
 
         const verAluno = page.locator('#tbodyAlunosTurmaDesk button[data-sgi-action="view-student"][data-id-usuario="9902"]');
-        await expect(verAluno).toHaveAttribute('aria-label', 'Visualizar aluno');
+        await expect(verAluno).toHaveAttribute('aria-label', 'Visualizar estudante');
         await expect(page.locator('#tbodyAlunosTurmaDesk button[data-sgi-action="edit-student"][data-id-usuario="9902"]'))
-            .toHaveAttribute('aria-label', 'Editar aluno Ana Pereira');
+            .toHaveAttribute('aria-label', 'Editar estudante Ana Pereira');
         await expect(page.locator('#tbodyAlunosTurmaDesk button[data-sgi-action="delete-student"][data-id-usuario="9902"]'))
-            .toHaveAttribute('aria-label', 'Excluir aluno Ana Pereira');
+            .toHaveAttribute('aria-label', 'Excluir estudante Ana Pereira');
         await expect(page.locator('#tbodyAlunosTurmaDesk button[data-sgi-action="edit-student"][data-id-usuario="9903"]'))
-            .toHaveAttribute('aria-label', 'Editar aluno Bia Lima');
+            .toHaveAttribute('aria-label', 'Editar estudante Bia Lima');
         await expect(page.locator('#tbodyAlunosTurmaDesk button[data-sgi-action="delete-student"][data-id-usuario="9903"]'))
-            .toHaveAttribute('aria-label', 'Excluir aluno Bia Lima');
+            .toHaveAttribute('aria-label', 'Excluir estudante Bia Lima');
         const modalDetalhes = page.locator('#modalVerAluno');
         const detalhesMostrados = modalDetalhes.evaluate((element) => new Promise((resolve) => {
             element.addEventListener('shown.bs.modal', resolve, { once: true });
         }));
         await verAluno.click();
         await detalhesMostrados;
-        await expect(page.getByRole('dialog', { name: 'Detalhes do aluno' })).toBeVisible();
+        await expect(page.getByRole('dialog', { name: 'Detalhes do estudante' })).toBeVisible();
         await expect(modalDetalhes).toBeFocused();
         await fecharComEscape(page, modalDetalhes, { restaurarFoco: true, acionador: verAluno });
         await expect(page.locator('#modalConfirmarExcluir')).toHaveAttribute('aria-labelledby', 'modalConfirmarExcluirTitulo');
@@ -270,12 +270,12 @@ test.describe('E03 — formulários, modais e controles de equipe', () => {
         }));
         await abrirAluno.click();
         await alunoMostrado;
-        await expect(page.getByRole('dialog', { name: 'Adicionar aluno' })).toBeVisible();
+        await expect(page.getByRole('dialog', { name: 'Adicionar estudante' })).toBeVisible();
         await expect(modalAluno.getByLabel('Nome completo')).toBeVisible();
         await expect(modalAluno.getByLabel('RM')).toBeVisible();
         await expect(modalAluno.getByLabel('Gênero')).toBeVisible();
         await expect(modalAluno.getByLabel('Data de nascimento')).toBeVisible();
-        await expect(modalAluno.getByRole('button', { name: 'Fechar janela Aluno' })).toBeVisible();
+        await expect(modalAluno.getByRole('button', { name: 'Fechar janela Estudante' })).toBeVisible();
         await fecharComEscape(page, modalAluno);
     });
 });

@@ -24,7 +24,9 @@ final class ConcurrentScheduleBarrierRepository implements JogoRepository
         $conflict = $this->inner->localConflict($date, $localId, $start, $end, $currentId);
         if (!$this->paused && $conflict === null) {
             $marker = $this->barrier . DIRECTORY_SEPARATOR . 'validated-' . $this->workerId;
-            if (@file_put_contents($marker, 'no-conflict', LOCK_EX) === false) {
+            $tmp = $marker . '.tmp.' . getmypid() . '.' . bin2hex(random_bytes(4));
+            if (@file_put_contents($tmp, 'no-conflict', LOCK_EX) === false || !@rename($tmp, $marker)) {
+                @unlink($tmp);
                 throw new RuntimeException('Não foi possível sinalizar a validação de conflito do agendamento.');
             }
             $deadline = microtime(true) + 10.0;

@@ -35,7 +35,7 @@ final class MysqliUsuarioManagementRepository implements UsuarioManagementReposi
         }
         $key = $matricula . '-' . $editionId;
         if ($this->one('SELECT 1 FROM usuarios WHERE chave_usuario_edicao = ? LIMIT 1', 's', [$key]) !== null) {
-            throw new RuntimeException('Já existe um aluno com este RM nesta edição do interclasse.');
+            throw new RuntimeException('Já existe um estudante com este RM nesta edição do interclasse.');
         }
 
         $temporaryPassword = StudentInitialPassword::VALUE;
@@ -43,7 +43,7 @@ final class MysqliUsuarioManagementRepository implements UsuarioManagementReposi
         $statement = $this->prepare('INSERT INTO usuarios (sigla_usuario, matricula_usuario, nome_usuario, senha_usuario, senha_troca_pendente, nivel_usuario, genero_usuario, data_nasc_usuario, foto_usuario, status_usuario, turmas_id_turma, interclasses_id_interclasse, chave_usuario_edicao) VALUES (\'RM\', ?, ?, ?, 1, \'3\', ?, ?, \'default.jpg\', \'1\', ?, ?, ?)');
         $statement->bind_param('sssssiis', $matricula, $name, $password, $gender, $birth, $classId, $editionId, $key);
         if (!$statement->execute()) {
-            $message = $statement->errno === 1062 ? 'RM já cadastrado nesta edição.' : 'Não foi possível cadastrar aluno.';
+            $message = $statement->errno === 1062 ? 'RM já cadastrado nesta edição.' : 'Não foi possível cadastrar estudante.';
             $statement->close();
             throw new RuntimeException($message);
         }
@@ -52,7 +52,7 @@ final class MysqliUsuarioManagementRepository implements UsuarioManagementReposi
 
         return [
             'status' => 'sucesso',
-            'mensagem' => 'Aluno cadastrado. A senha inicial é sesi-senai e deverá ser trocada no primeiro acesso.',
+            'mensagem' => 'Estudante cadastrado. A senha inicial é sesi-senai e deverá ser trocada no primeiro acesso.',
             'id_usuario' => $id,
             'senha_temporaria' => $temporaryPassword,
         ];
@@ -85,21 +85,21 @@ final class MysqliUsuarioManagementRepository implements UsuarioManagementReposi
                 [$classId, $editionId],
             );
             if ($student === null || $class === null) {
-                throw new RuntimeException('Aluno ou turma não pertence à edição ativa.');
+                throw new RuntimeException('Estudante ou turma não pertence à edição ativa.');
             }
             if ((int) ($student['turmas_id_turma'] ?? 0) === $classId) {
                 Transaction::commit($this->connection);
                 return;
             }
             if ($this->hasStudentHistory($userId)) {
-                throw new RuntimeException('Não é possível transferir aluno com histórico esportivo ou disciplinar.');
+                throw new RuntimeException('Não é possível transferir estudante com histórico esportivo ou disciplinar.');
             }
 
             $statement = $this->prepare('UPDATE usuarios SET turmas_id_turma = ?, interclasses_id_interclasse = ?, chave_usuario_edicao = CONCAT(matricula_usuario, \'-\', ?) WHERE id_usuario = ? AND nivel_usuario = \'3\'');
             $statement->bind_param('iiii', $classId, $editionId, $editionId, $userId);
             if (!$statement->execute()) {
                 $statement->close();
-                throw new RuntimeException('Não foi possível atualizar o vínculo do aluno.');
+                throw new RuntimeException('Não foi possível atualizar o vínculo do estudante.');
             }
             $statement->close();
             Transaction::commit($this->connection);
@@ -330,7 +330,7 @@ final class MysqliUsuarioManagementRepository implements UsuarioManagementReposi
                 [$id, $editionId],
             );
             if ($student === null) {
-                throw new RuntimeException('Aluno não pertence à edição ativa.');
+                throw new RuntimeException('Estudante não pertence à edição ativa.');
             }
 
             if ((string) $student['genero_usuario'] !== $gender) {
@@ -349,7 +349,7 @@ final class MysqliUsuarioManagementRepository implements UsuarioManagementReposi
                 $rosters->bind_param('ii', $editionId, $id);
                 if (!$rosters->execute()) {
                     $rosters->close();
-                    throw new RuntimeException('Não foi possível conferir o elenco atual do aluno.');
+                    throw new RuntimeException('Não foi possível conferir o elenco atual do estudante.');
                 }
                 $activeTeams = $rosters->get_result()->fetch_all(MYSQLI_ASSOC);
                 $rosters->close();
@@ -360,7 +360,7 @@ final class MysqliUsuarioManagementRepository implements UsuarioManagementReposi
                         (int) $team['categoria_turma'],
                         (int) $team['categoria_modalidade'],
                     )) {
-                        throw new RuntimeException('O gênero informado é incompatível com um elenco ativo do aluno.');
+                        throw new RuntimeException('O gênero informado é incompatível com um elenco ativo do estudante.');
                     }
                 }
             }
@@ -370,13 +370,13 @@ final class MysqliUsuarioManagementRepository implements UsuarioManagementReposi
                 'si',
                 [$key, $id],
             ) !== null) {
-                throw new RuntimeException('Já existe outro aluno com este RM nesta edição.');
+                throw new RuntimeException('Já existe outro estudante com este RM nesta edição.');
             }
             $statement = $this->prepare("UPDATE usuarios SET nome_usuario = ?, matricula_usuario = ?, genero_usuario = ?, data_nasc_usuario = ?, chave_usuario_edicao = ? WHERE id_usuario = ? AND nivel_usuario = '3' AND interclasses_id_interclasse = ?");
             $statement->bind_param('sssssii', $name, $normalised, $gender, $birth, $key, $id, $editionId);
             if (!$statement->execute()) {
                 $statement->close();
-                throw new RuntimeException('Não foi possível atualizar aluno.');
+                throw new RuntimeException('Não foi possível atualizar estudante.');
             }
             $statement->close();
             Transaction::commit($this->connection);

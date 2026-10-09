@@ -51,6 +51,23 @@ final class PontuacaoServiceTest extends TestCase
         ], $repository->replaced);
         self::assertSame([1 => 10, 2 => 7, 3 => 5], $repository->deltas);
     }
+
+    public function testSalvarPodioManualAppliesPositionsAndDeltas(): void
+    {
+        $repository = new PontuacaoPodioRepositoryFake();
+        $service = new PontuacaoService($repository);
+        $service->salvarPodioManual(1, 7, [
+            ['posicao' => 1, 'id_equipe' => 101],
+            ['posicao' => 2, 'id_equipe' => 102],
+            ['posicao' => 3, 'id_turma' => 3],
+        ]);
+
+        self::assertCount(3, $repository->replaced);
+        self::assertSame(1, $repository->replaced[0]['posicao']);
+        self::assertSame(1, $repository->replaced[0]['id_turma']);
+        self::assertSame('manual', $repository->replaced[0]['origem_registro']);
+        self::assertSame([1 => 10, 2 => 7, 3 => 5], $repository->deltas);
+    }
 }
 
 final class PontuacaoPodioRepositoryFake implements PodioRepository
@@ -109,5 +126,15 @@ final class PontuacaoPodioRepositoryFake implements PodioRepository
 
     public function invalidarFontesSemOrigemAtual(int $interclasseId, int $modalidadeId): void
     {
+    }
+
+    public function pontosPadraoEdicao(int $interclasseId): array
+    {
+        return [1 => 10, 2 => 7, 3 => 5];
+    }
+
+    public function carregarPodioModalidade(int $interclasseId, int $modalidadeId): array
+    {
+        return [];
     }
 }

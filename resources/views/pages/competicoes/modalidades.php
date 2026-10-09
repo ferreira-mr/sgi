@@ -95,6 +95,46 @@ $paginaAtiva = 'modalidades';
     </div>
 </div>
 
+<div class="modal fade" id="modalGerenciarPodio" tabindex="-1" aria-labelledby="modalGerenciarPodioLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow rounded-4">
+            <div class="modal-header border-0 pb-0">
+                <h2 class="modal-title fs-5 fw-bold text-dark" id="modalGerenciarPodioLabel">
+                    <i class="bi bi-award-fill text-warning me-2"></i>Pódio da Modalidade
+                </h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3" id="podioNomeModalidade">Selecione as equipes vencedoras para registrar o pódio e aplicar as pontuações às turmas correspondentes.</p>
+                <form id="formGerenciarPodio">
+                    <div class="mb-3">
+                        <label for="selectPodio1" class="form-label fw-bold">🥇 1º Lugar (Campeão)</label>
+                        <select class="form-select" id="selectPodio1">
+                            <option value="">Selecione a equipe vencedora...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="selectPodio2" class="form-label fw-bold">🥈 2º Lugar (Vice-campeão)</label>
+                        <select class="form-select" id="selectPodio2">
+                            <option value="">Selecione a equipe vice-campeã...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="selectPodio3" class="form-label fw-bold">🥉 3º Lugar (3º colocado)</label>
+                        <select class="form-select" id="selectPodio3">
+                            <option value="">Selecione o 3º colocado...</option>
+                        </select>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2 mt-4">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary fw-bold" id="btnSalvarPodio">Salvar Pódio</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script type="application/json" data-sgi-config="competicoes/modalidades"><?= json_encode(['value2' => ($nivelUsuario)], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR) ?></script>
 <script data-sgi-page src="<?= \App\Shared\Http\Assets::url('js/pages/competicoes/modalidades.js') ?>"></script>
 

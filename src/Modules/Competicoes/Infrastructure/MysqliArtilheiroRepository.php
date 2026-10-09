@@ -74,7 +74,7 @@ final class MysqliArtilheiroRepository implements ArtilheiroRepository
     {
         $statement = $this->connection->prepare('SELECT nivel_usuario FROM usuarios WHERE id_usuario = ? LIMIT 1');
         if ($statement === false) {
-            throw new RuntimeException('Não foi possível consultar o atleta.');
+            throw new RuntimeException('Não foi possível consultar o estudante.');
         }
         $statement->bind_param('i', $userId);
         $statement->execute();
@@ -93,7 +93,7 @@ final class MysqliArtilheiroRepository implements ArtilheiroRepository
              LIMIT 1',
         );
         if ($statement === false) {
-            throw new RuntimeException('Não foi possível validar o atleta no jogo.');
+            throw new RuntimeException('Não foi possível validar o estudante no jogo.');
         }
         $statement->bind_param('ii', $userId, $gameId);
         $statement->execute();

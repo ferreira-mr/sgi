@@ -10,7 +10,7 @@ include SGI_ROOT . '/resources/views/components/aluno-nav.php';
     <div class=" w-100 d-flex flex-column gap-4">
 
       <div class="aluno-hero bg-primary rounded-4 mb-4 text-white sgi-aluno-home-hero">
-        <h1>Olá, <?= htmlspecialchars($_SESSION['nome'] ?? 'Aluno', ENT_QUOTES) ?>!   </h1>
+        <h1>Olá, <?= htmlspecialchars($_SESSION['nome'] ?? 'Estudante', ENT_QUOTES) ?>!   </h1>
         <p>Confira as competições disponíveis e participe!</p>
 
         <!-- NOVO BOTÃO DE ACESSO AOS JOGOS -->

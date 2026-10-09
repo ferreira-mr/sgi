@@ -330,8 +330,8 @@ test.describe('E05 — seleção, vínculo de alunos e senhas de colaboradores',
         const ana = page.getByRole('checkbox', { name: 'Adicionar Ana E05, matrícula E05-9801 à equipe' });
         const alexandre = page.getByRole('checkbox', { name: 'Adicionar Alexandre Albuquerque Fonseca de Alcântara, matrícula E05-9802 à equipe' });
         const membro = page.getByRole('checkbox', { name: 'Bianca já vinculada E05, matrícula E05-9803, já vinculado à equipe' });
-        const addOne = page.getByRole('button', { name: /Adicionar 1 aluno/i });
-        const addTwo = page.getByRole('button', { name: /Adicionar 2 alunos/i });
+        const addOne = page.getByRole('button', { name: /Adicionar 1 estudante/i });
+        const addTwo = page.getByRole('button', { name: /Adicionar 2 estudantes/i });
 
         await expect(ana).toBeVisible();
         await expect(alexandre).toBeVisible();

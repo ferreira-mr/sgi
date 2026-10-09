@@ -28,6 +28,11 @@ $paginaAtiva = 'ranking';
     <header class="d-flex align-items-center justify-content-between gap-3 mb-2">
         <p class="small text-body-secondary mb-0" id="nomeInterclasseMob"></p>
         <div class="d-flex align-items-center gap-2">
+            <?php if ($nivelNum === 0): ?>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="btnReconciliarRankingMob" title="Recalcular pontuação das turmas">
+                    <i class="bi bi-arrow-repeat"></i> Recalcular
+                </button>
+            <?php endif; ?>
             <?php if ($eAdmin): ?>
                 <button type="button" class="btn btn-sm btn-outline-dark btn-imprimir" onclick="window.print()">
                     <i class="bi bi-printer"></i> Imprimir
@@ -59,6 +64,11 @@ $paginaAtiva = 'ranking';
             <div id="filtrosDesk" class="d-flex overflow-auto gap-2"></div>
 
             <div class="d-flex align-items-center gap-3">
+                <?php if ($nivelNum === 0): ?>
+                    <button type="button" class="btn btn-outline-primary fw-bold" id="btnReconciliarRankingDesk" title="Recalcular pontuação das turmas">
+                        <i class="bi bi-arrow-repeat"></i> Recalcular Ranking
+                    </button>
+                <?php endif; ?>
                 <?php if ($eAdmin): ?>
                     <button type="button" class="btn btn-outline-dark fw-bold btn-imprimir" onclick="window.print()">
                         <i class="bi bi-printer"></i> Imprimir Ranking

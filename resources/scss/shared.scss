@@ -532,6 +532,12 @@ body {
   flex-shrink: 0;
 }
 
+/* O Bootstrap aplica `display: flex !important` em `.d-md-flex`. A classe
+   explícita garante que a casca não volte a aparecer nas telas filhas da SPA. */
+.sgi-app-shell .sgi-mesario-topbar.sgi-mesario-topbar--oculta {
+  display: none !important;
+}
+
 @media print {
   body:has(.sgi-ranking-page) {
     background: #fff !important;

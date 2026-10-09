@@ -157,7 +157,7 @@ final class MysqliEquipeRepository implements EquipeRepository
                         $alreadyOnTarget = true;
                         continue;
                     }
-                    throw new \InvalidArgumentException('O aluno já está vinculado a outra equipe desta modalidade.');
+                    throw new \InvalidArgumentException('O estudante já está vinculado a outra equipe desta modalidade.');
                 }
                 if ($alreadyOnTarget) {
                     // Replaying the same administrative request remains idempotent,
@@ -222,12 +222,12 @@ final class MysqliEquipeRepository implements EquipeRepository
              ORDER BY m.id_modalidade, e.id_equipe",
         );
         if ($statement === false) {
-            throw new RuntimeException('Não foi possível consultar as modalidades do aluno.');
+            throw new RuntimeException('Não foi possível consultar as modalidades do estudante.');
         }
         $statement->bind_param('ii', $userId, $editionId);
         if (!$statement->execute()) {
             $statement->close();
-            throw new RuntimeException('Não foi possível consultar as modalidades do aluno.');
+            throw new RuntimeException('Não foi possível consultar as modalidades do estudante.');
         }
         $rows = $statement->get_result()->fetch_all(MYSQLI_ASSOC);
         $statement->close();
@@ -269,12 +269,12 @@ final class MysqliEquipeRepository implements EquipeRepository
     {
         $statement = $this->connection->prepare($sql);
         if ($statement === false) {
-            throw new RuntimeException('Não foi possível contar os alunos da equipe.');
+            throw new RuntimeException('Não foi possível contar os estudantes da equipe.');
         }
         $statement->bind_param(str_repeat('i', count($params)), ...$params);
         if (!$statement->execute()) {
             $statement->close();
-            throw new RuntimeException('Não foi possível contar os alunos da equipe.');
+            throw new RuntimeException('Não foi possível contar os estudantes da equipe.');
         }
         $count = (int) $statement->get_result()->fetch_column();
         $statement->close();
@@ -288,12 +288,12 @@ final class MysqliEquipeRepository implements EquipeRepository
             'DELETE FROM equipes_has_usuarios WHERE equipes_id_equipe = ? AND usuarios_id_usuario = ?',
         );
         if ($statement === false) {
-            throw new RuntimeException('Não foi possível remover aluno da equipe.');
+            throw new RuntimeException('Não foi possível remover estudante da equipe.');
         }
         $statement->bind_param('ii', $teamId, $userId);
         if (!$statement->execute()) {
             $statement->close();
-            throw new RuntimeException('Não foi possível remover aluno da equipe.');
+            throw new RuntimeException('Não foi possível remover estudante da equipe.');
         }
         $statement->close();
     }

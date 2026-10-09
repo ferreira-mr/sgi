@@ -102,7 +102,8 @@ window.SGIPage.mount("eventos/configurar-agenda", function (pageConfig, pageScop
 
     function podeIniciar(j) {
         if (!j || j.status_jogo !== 'Agendado') return false;
-        if (!j.data_jogo || !j.inicio_jogo || !j.termino_jogo || !j.locais_id_local) return false;
+        const horarioObrigatorio = j.exige_horario_agendado !== false;
+        if (!j.data_jogo || !j.locais_id_local || (horarioObrigatorio && (!j.inicio_jogo || !j.termino_jogo))) return false;
         const hj = hojeISO();
         return j.data_jogo <= hj;
     }

@@ -231,7 +231,7 @@ test.describe('Mesário — fluxo visual completo offline', () => {
         await expect(page.locator('#modalArtilheiro')).toBeVisible();
         await expect(page.locator('.score-number').first()).toHaveText('0');
         await page.locator('#btnSalvarArtilheiro').click();
-        await expect(page.locator('#msgArtilheiro')).toContainText('Selecione o aluno responsável pela jogada', { timeout: 10_000 });
+        await expect(page.locator('#msgArtilheiro')).toContainText('Selecione o estudante responsável pela jogada', { timeout: 10_000 });
         await expect(page.locator('.score-number').first()).toHaveText('0');
         await expect.poll(() => page.locator('#selectAlunoArtilheiro option').count()).toBeGreaterThan(1);
         await selecionarAtletaE2EOffline(page, fixture.nomeAtleta);

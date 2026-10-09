@@ -125,7 +125,7 @@ test('E09 histórico de arrecadação diferencia erro de lista vazia e permite t
 
     await dialog.getByRole('button', { name: /Tentar novamente/i }).click();
     await expect(dialog).toContainText(/Nenhum registro de arrecadação encontrado para esta turma/i);
-    expect(consultasAoHistorico).toBe(2);
+    await expect.poll(() => consultasAoHistorico).toBe(2);
 });
 
 test('E09 falha ao salvar arrecadação preserva kg e libera os dois botões responsivos', async ({ page, request }) => {
@@ -231,10 +231,11 @@ test('E09 ranking mantém dados principais confirmados se a consulta de categori
     await expect(page.locator('#msgDesk')).toContainText(/categorias.*indisponível|dados principais.*disponíveis/i);
 
     await page.getByRole('button', { name: /Tentar novamente/i }).click();
+    await expect(page.locator('#msgDesk')).not.toContainText(/categorias.*indisponível/i);
     await expect(lista.locator('.card-turma')).toContainText('Turma E09 Confirmada');
     await expect(page.locator('#totalTurmasDesk')).toContainText('1 Turmas');
-    expect(consultasDeRanking).toBe(2);
-    expect(consultasDeCategoria).toBe(2);
+    await expect.poll(() => consultasDeRanking).toBe(2);
+    await expect.poll(() => consultasDeCategoria).toBe(2);
 });
 
 test.describe('E09 estado de ranking do aluno', () => {

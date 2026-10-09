@@ -90,7 +90,7 @@ $paginaAtiva = 'dashboard';
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label for="arquivoUpload" class="form-label fw-semibold">Selecionar PDF dos alunos</label>
+                        <label for="arquivoUpload" class="form-label fw-semibold">Selecionar PDF dos estudantes</label>
                         <input type="file" id="arquivoUpload" class="form-control" accept=".pdf,application/pdf" aria-describedby="descricaoArquivoUpload">
                         <p id="descricaoArquivoUpload" class="text-body-secondary small mt-2 mb-0">Formato aceito: PDF de até 10 MB. O arquivo deve conter texto selecionável.</p>
                         <span id="nomeArquivo" class="d-none small text-success mt-2" role="status" aria-live="polite" aria-atomic="true"></span>

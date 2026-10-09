@@ -173,7 +173,7 @@ test('placar, ocorrências e arrecadação expõem rótulos, modais nomeados e r
     await grupoTipoOcorrencia.locator('label[for="tipoOcorrenciaAmarelo"]').click();
     await expect(grupoTipoOcorrencia.getByRole('radio', { name: 'Amarelo' })).toBeChecked();
     await expect(dialogOcorrenciaPlacar.getByLabel('Turma')).toBeVisible();
-    await expect(dialogOcorrenciaPlacar.getByLabel('Aluno')).toBeDisabled();
+    await expect(dialogOcorrenciaPlacar.getByLabel('Estudante')).toBeDisabled();
     await expect(dialogOcorrenciaPlacar.getByLabel('Descrição')).toBeVisible();
     await fecharComEscape(page, modalOcorrenciaPlacar, adicionarOcorrenciaPlacar);
 
@@ -187,7 +187,7 @@ test('placar, ocorrências e arrecadação expõem rótulos, modais nomeados e r
     await abrirModal(adicionarPonto, modalArtilheiro);
     const dialogArtilheiro = page.getByRole('dialog', { name: 'Registrar ponto' });
     await expect(dialogArtilheiro.getByLabel('Equipe')).toBeVisible();
-    await expect(dialogArtilheiro.getByLabel('Aluno responsável pela jogada')).toHaveAttribute('aria-required', 'true');
+    await expect(dialogArtilheiro.getByLabel('Estudante responsável pela jogada')).toHaveAttribute('aria-required', 'true');
     await fecharComEscape(page, modalArtilheiro, adicionarPonto);
 });
 

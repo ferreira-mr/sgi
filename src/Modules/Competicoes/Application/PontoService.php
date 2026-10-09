@@ -57,7 +57,7 @@ final class PontoService
         $key = trim((string) ($data['chave_jogada'] ?? ''));
 
         if ($userId <= 0) {
-            throw new InvalidArgumentException('Selecione o aluno responsável pela jogada para confirmar o ponto.');
+            throw new InvalidArgumentException('Selecione o estudante responsável pela jogada para confirmar o ponto.');
         }
         if ($gameId <= 0 || $matchId <= 0 || $teamId <= 0) {
             throw new InvalidArgumentException('Jogo, partida, equipe e atleta são obrigatórios.');

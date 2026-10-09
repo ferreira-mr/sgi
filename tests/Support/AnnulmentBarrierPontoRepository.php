@@ -75,7 +75,9 @@ final class AnnulmentBarrierPontoRepository implements PontoRepository
             'status_jogo' => $this->observedGameStatus,
             'pid' => getmypid(),
         ];
-        if (@file_put_contents($ready, json_encode($payload, JSON_THROW_ON_ERROR), LOCK_EX) === false) {
+        $tmp = $ready . '.tmp.' . getmypid() . '.' . bin2hex(random_bytes(4));
+        if (@file_put_contents($tmp, json_encode($payload, JSON_THROW_ON_ERROR), LOCK_EX) === false || !@rename($tmp, $ready)) {
+            @unlink($tmp);
             throw new RuntimeException('Não foi possível anunciar a validação da anulação.');
         }
 

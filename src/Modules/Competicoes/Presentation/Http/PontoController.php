@@ -122,7 +122,7 @@ final class PontoController
                     $point = $this->service->registrar($data, $operatorId);
                     return Response::json([
                         'success' => true,
-                        'message' => 'Ponto registrado com o atleta responsável.',
+                        'message' => 'Ponto registrado com o estudante responsável.',
                         'id' => (int) ($point['id_artilheiro'] ?? 0),
                         'id_ponto' => (int) ($point['id_artilheiro'] ?? 0),
                         'ponto' => $point,
@@ -143,7 +143,7 @@ final class PontoController
                     $point = $this->service->anular($pointId, $operatorId);
                     return Response::json([
                         'success' => true,
-                        'message' => 'Ponto anulado; o registro do atleta foi preservado.',
+                        'message' => 'Ponto anulado; o registro do estudante foi preservado.',
                         'id_ponto' => (int) ($point['id_artilheiro'] ?? $pointId),
                         'ponto' => $point,
                         'placar' => (int) ($point['resultado_partida'] ?? 0),

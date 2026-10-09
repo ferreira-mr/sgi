@@ -31,4 +31,16 @@ final class RankingService
     {
         return $this->turmas->atualizarPeloRanking($data);
     }
+
+    /**
+     * @return array{reconciliadas: int, total_turmas: int, turmas: list<array<string, mixed>>}
+     */
+    public function reconciliar(int $editionId): array
+    {
+        if ($editionId <= 0) {
+            throw new \InvalidArgumentException('Edição inválida para reconciliação.');
+        }
+
+        return $this->ranking->reconciliarEdicao($editionId);
+    }
 }

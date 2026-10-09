@@ -9,7 +9,7 @@ $labelNiveis = [
     0 => ['label' => 'Administrador', 'icon' => 'bi-shield-fill-check', 'color' => '#E30613'],
     1 => ['label' => 'Colaborador',   'icon' => 'bi-person-badge-fill', 'color' => '#0d6efd'],
     2 => ['label' => 'Mesário',       'icon' => 'bi-person-check-fill', 'color' => '#6f42c1'],
-    3 => ['label' => 'Aluno',         'icon' => 'bi-person-fill',       'color' => '#198754'],
+    3 => ['label' => 'Estudante',     'icon' => 'bi-person-fill',       'color' => '#198754'],
 ];
 $nivelInfo = $labelNiveis[$nivelUsuario] ?? ['label' => 'Desconhecido', 'icon' => 'bi-question-circle', 'color' => '#6c757d'];
 $nivelBadgeClass = [0 => 'text-bg-danger', 1 => 'text-bg-primary', 2 => 'text-bg-secondary', 3 => 'text-bg-success'][$nivelUsuario] ?? 'text-bg-secondary';

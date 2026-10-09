@@ -158,7 +158,7 @@ $isMesario = $nivelUsuario === 2;
                         <h5 class="h5 mb-0 fw-semibold text-body">TURMAS</h5>
                         <i class="bi bi-chevron-right text-body-tertiary ms-auto fs-5" aria-hidden="true"></i>
                     </div>
-                    <p class="card-text text-body-secondary mb-0">Visualize as turmas participantes e acesse os alunos.</p>
+                    <p class="card-text text-body-secondary mb-0">Visualize as turmas participantes e acesse os estudantes.</p>
                 </a>
             </div>
             <div class="col-12 col-md-6 col-lg-4">
@@ -271,7 +271,7 @@ $isMesario = $nivelUsuario === 2;
                         <h5 class="h5 mb-0 fw-semibold text-body">TURMAS</h5>
                         <i class="bi bi-chevron-right text-body-tertiary ms-auto fs-5" aria-hidden="true"></i>
                     </div>
-                    <p class="card-text text-body-secondary mb-0">Categorias e turmas desta edição: cadastro, PDF de alunos e acesso às equipes por turma.</p>
+                    <p class="card-text text-body-secondary mb-0">Categorias e turmas desta edição: cadastro, PDF de estudantes e acesso às equipes por turma.</p>
                 </a>
             </div>
             <div class="col-12 col-md-6 col-lg-4">

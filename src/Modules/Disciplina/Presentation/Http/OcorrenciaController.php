@@ -198,13 +198,13 @@ final class OcorrenciaController
 
         $role = $this->service->roleOfUser($userId);
         if ($role === null) {
-            return Response::json(['success' => false, 'message' => 'Atleta não encontrado.'], 404);
+            return Response::json(['success' => false, 'message' => 'Estudante não encontrado.'], 404);
         }
         $userEdition = $this->service->editionOfUser($userId);
         $edition = $gameEdition ?? $userEdition;
         if ($edition === null) {
             if (!in_array($role, [0, 1], true)) {
-                return Response::json(['success' => false, 'message' => 'A edição do atleta não foi encontrada.'], 404);
+                return Response::json(['success' => false, 'message' => 'A edição do estudante não foi encontrada.'], 404);
             }
             if (($denied = $this->access->authorize()) !== null) {
                 return $denied;
@@ -215,10 +215,10 @@ final class OcorrenciaController
 
         if ($role === 3) {
             if ($userEdition === null || ($gameEdition !== null && $userEdition !== $gameEdition)) {
-                return Response::json(['success' => false, 'message' => 'Atleta e ocorrência não pertencem à mesma edição.'], 422);
+                return Response::json(['success' => false, 'message' => 'Estudante e ocorrência não pertencem à mesma edição.'], 422);
             }
             if ($gameId > 0 && !$this->service->userParticipatesInGame($userId, $gameId)) {
-                return Response::json(['success' => false, 'message' => 'Atleta não participa deste jogo.'], 422);
+                return Response::json(['success' => false, 'message' => 'Estudante não participa deste jogo.'], 422);
             }
         }
 
@@ -234,7 +234,7 @@ final class OcorrenciaController
                 return Response::json(['success' => false, 'message' => 'A turma não participa deste jogo.'], 422);
             }
             if ($role === 3 && !$this->service->userBelongsToTurma($userId, $classId)) {
-                return Response::json(['success' => false, 'message' => 'O atleta não pertence à turma informada.'], 422);
+                return Response::json(['success' => false, 'message' => 'O estudante não pertence à turma informada.'], 422);
             }
         }
 

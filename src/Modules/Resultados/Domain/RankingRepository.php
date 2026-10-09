@@ -12,4 +12,10 @@ interface RankingRepository
      */
     public function list(array $filters): array;
 
+    /**
+     * Reconcilia a pontuação das turmas da edição com base na soma de arrecadação e pódios ativos.
+     *
+     * @return array{reconciliadas: int, total_turmas: int, turmas: list<array<string, mixed>>}
+     */
+    public function reconciliarEdicao(int $editionId): array;
 }

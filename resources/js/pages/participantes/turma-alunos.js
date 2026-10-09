@@ -113,22 +113,22 @@ window.SGIPage.mount("participantes/turma-alunos", function (pageConfig, pageSco
 
         try {
             const r = await fetch(`${API}usuarios?acao=listar_competidores&id_turma=${encodeURIComponent(idTurma)}&id_interclasse=${encodeURIComponent(idInterclasse)}`);
-            if (!r.ok) throw new Error('Não foi possível carregar os alunos desta turma.');
+            if (!r.ok) throw new Error('Não foi possível carregar os estudantes desta turma.');
             let data;
             try {
                 data = await r.json();
             } catch (_) {
-                throw new Error('Não foi possível carregar os alunos desta turma.');
+                throw new Error('Não foi possível carregar os estudantes desta turma.');
             }
             if (data && typeof data === 'object' && data.success === false) {
-                throw new Error('Não foi possível carregar os alunos desta turma.');
+                throw new Error('Não foi possível carregar os estudantes desta turma.');
             }
             const lista = Array.isArray(data) ? data
                 : (Array.isArray(data?.competidores) ? data.competidores
                     : (Array.isArray(data?.usuarios) ? data.usuarios : null));
             if (!lista || !lista.every(aluno =>
                 aluno && typeof aluno === 'object' && !Array.isArray(aluno) && aluno.id_usuario != null
-            )) throw new Error('Não foi possível carregar os alunos desta turma.');
+            )) throw new Error('Não foi possível carregar os estudantes desta turma.');
 
             alunosTodos = lista;
             alunosMap = {};
@@ -137,7 +137,7 @@ window.SGIPage.mount("participantes/turma-alunos", function (pageConfig, pageSco
             paginaAtual = 1;
         } catch (e) {
             console.error(e);
-            erroAlunos = e.message || 'Não foi possível carregar os alunos desta turma.';
+            erroAlunos = e.message || 'Não foi possível carregar os estudantes desta turma.';
         } finally {
             carregandoAlunos = false;
             renderizarAlunos();
@@ -170,18 +170,18 @@ window.SGIPage.mount("participantes/turma-alunos", function (pageConfig, pageSco
         const desk = document.getElementById('tbodyAlunosTurmaDesk');
 
         const erroMob = `<div class="alert alert-danger d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mb-3" role="alert">
-            <span>${esc(erroAlunos || 'Não foi possível carregar os alunos desta turma.')}</span>
+            <span>${esc(erroAlunos || 'Não foi possível carregar os estudantes desta turma.')}</span>
             <button type="button" class="btn btn-outline-danger align-self-start align-self-sm-center" data-sgi-action="retry-roster">Tentar novamente</button>
         </div>`;
         const erroDesk = `<tr><td colspan="4"><div class="alert alert-danger d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mb-0" role="alert">
-            <span>${esc(erroAlunos || 'Não foi possível carregar os alunos desta turma.')}</span>
+            <span>${esc(erroAlunos || 'Não foi possível carregar os estudantes desta turma.')}</span>
             <button type="button" class="btn btn-outline-danger align-self-start align-self-sm-center" data-sgi-action="retry-roster">Tentar novamente</button>
         </div></td></tr>`;
         const atualizandoMob = carregandoAlunos ? '<div class="small text-body-secondary" role="status">Atualizando a lista…</div>' : '';
         const atualizandoDesk = carregandoAlunos ? '<tr><td colspan="4" class="small text-body-secondary" role="status">Atualizando a lista…</td></tr>' : '';
 
         if (!alunosCarregados && carregandoAlunos) {
-            const carregando = '<div class="text-center py-5 text-body-secondary" role="status"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Carregando alunos…</div>';
+            const carregando = '<div class="text-center py-5 text-body-secondary" role="status"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Carregando estudantes…</div>';
             mob.innerHTML = carregando;
             desk.innerHTML = `<tr><td colspan="4">${carregando}</td></tr>`;
             return;
@@ -194,26 +194,26 @@ window.SGIPage.mount("participantes/turma-alunos", function (pageConfig, pageSco
 
         if (!total) {
             const vazio = termo
-                ? '<i class="bi bi-search"></i><p><strong>Nenhum resultado para sua busca.</strong></p><p class="small text-muted">Limpe a busca para ver todos os alunos.</p><button type="button" class="btn btn-outline-primary btn-sm" data-sgi-action="clear-roster-search">Limpar busca</button>'
-                : '<i class="bi bi-people"></i><p><strong>Nenhum aluno cadastrado nesta turma.</strong></p><p class="small text-muted">Clique em "Adicionar Aluno" ou importe um PDF para começar.</p>';
+                ? '<i class="bi bi-search"></i><p><strong>Nenhum resultado para sua busca.</strong></p><p class="small text-muted">Limpe a busca para ver todos os estudantes.</p><button type="button" class="btn btn-outline-primary btn-sm" data-sgi-action="clear-roster-search">Limpar busca</button>'
+                : '<i class="bi bi-people"></i><p><strong>Nenhum estudante cadastrado nesta turma.</strong></p><p class="small text-muted">Clique em "Adicionar estudante" ou importe um PDF para começar.</p>';
             mob.innerHTML = `${erroAlunos ? erroMob : ''}${atualizandoMob}<div class="text-center py-5 text-body-secondary">${vazio}</div>`;
             desk.innerHTML = `${erroAlunos ? erroDesk : ''}${atualizandoDesk}<tr><td colspan="4"><div class="text-center py-5 text-body-secondary">${vazio}</div></td></tr>`;
         } else {
             const acoesMob = (u) => `
                 <div class="d-flex gap-1">
-                    <button type="button" class="btn btn-sm btn-light border text-primary px-2 py-1" data-bs-toggle="tooltip" title="Visualizar" aria-label="Visualizar aluno" data-sgi-action="view-student" data-id-usuario="${esc(u.id_usuario)}">
+                    <button type="button" class="btn btn-sm btn-light border text-primary px-2 py-1" data-bs-toggle="tooltip" title="Visualizar" aria-label="Visualizar estudante" data-sgi-action="view-student" data-id-usuario="${esc(u.id_usuario)}">
                         <i class="bi bi-eye"></i>
                     </button>
                     ${podeGerenciar ? `
-                    <button type="button" class="btn btn-sm btn-light border text-secondary px-2 py-1" data-bs-toggle="tooltip" title="Editar" aria-label="Editar aluno ${escAttr(u.nome_usuario)}" data-sgi-action="edit-student" data-id-usuario="${esc(u.id_usuario)}">
+                    <button type="button" class="btn btn-sm btn-light border text-secondary px-2 py-1" data-bs-toggle="tooltip" title="Editar" aria-label="Editar estudante ${escAttr(u.nome_usuario)}" data-sgi-action="edit-student" data-id-usuario="${esc(u.id_usuario)}">
                         <i class="bi bi-pencil"></i>
                     </button>` : ''}
                     ${podeExcluir ? `
-                    <button type="button" class="btn btn-sm btn-light border text-danger px-2 py-1" data-bs-toggle="tooltip" title="Excluir" aria-label="Excluir aluno ${escAttr(u.nome_usuario)}" data-sgi-action="delete-student" data-id-usuario="${esc(u.id_usuario)}">
+                    <button type="button" class="btn btn-sm btn-light border text-danger px-2 py-1" data-bs-toggle="tooltip" title="Excluir" aria-label="Excluir estudante ${escAttr(u.nome_usuario)}" data-sgi-action="delete-student" data-id-usuario="${esc(u.id_usuario)}">
                         <i class="bi bi-trash"></i>
                     </button>` : ''}
                     ${podeResetarSenha ? `
-                    <button type="button" class="btn btn-sm btn-light border text-warning-emphasis px-2 py-1" data-bs-toggle="tooltip" title="Resetar senha" aria-label="Resetar senha do aluno" data-sgi-action="reset-student-password" data-id-usuario="${esc(u.id_usuario)}">
+                    <button type="button" class="btn btn-sm btn-light border text-warning-emphasis px-2 py-1" data-bs-toggle="tooltip" title="Resetar senha" aria-label="Resetar senha do estudante" data-sgi-action="reset-student-password" data-id-usuario="${esc(u.id_usuario)}">
                         <i class="bi bi-key-fill"></i>
                     </button>` : ''}
                 </div>`;
@@ -230,19 +230,19 @@ window.SGIPage.mount("participantes/turma-alunos", function (pageConfig, pageSco
 
             const acoesDesk = (u) => `
                 <div class="d-flex gap-1 justify-content-center">
-                    <button type="button" class="btn btn-sm btn-light border text-primary px-2 py-1" data-bs-toggle="tooltip" title="Visualizar" aria-label="Visualizar aluno" data-sgi-action="view-student" data-id-usuario="${esc(u.id_usuario)}">
+                    <button type="button" class="btn btn-sm btn-light border text-primary px-2 py-1" data-bs-toggle="tooltip" title="Visualizar" aria-label="Visualizar estudante" data-sgi-action="view-student" data-id-usuario="${esc(u.id_usuario)}">
                         <i class="bi bi-eye"></i>
                     </button>
                     ${podeGerenciar ? `
-                    <button type="button" class="btn btn-sm btn-light border text-secondary px-2 py-1" data-bs-toggle="tooltip" title="Editar" aria-label="Editar aluno ${escAttr(u.nome_usuario)}" data-sgi-action="edit-student" data-id-usuario="${esc(u.id_usuario)}">
+                    <button type="button" class="btn btn-sm btn-light border text-secondary px-2 py-1" data-bs-toggle="tooltip" title="Editar" aria-label="Editar estudante ${escAttr(u.nome_usuario)}" data-sgi-action="edit-student" data-id-usuario="${esc(u.id_usuario)}">
                         <i class="bi bi-pencil"></i>
                     </button>` : ''}
                     ${podeExcluir ? `
-                    <button type="button" class="btn btn-sm btn-light border text-danger px-2 py-1" data-bs-toggle="tooltip" title="Excluir" aria-label="Excluir aluno ${escAttr(u.nome_usuario)}" data-sgi-action="delete-student" data-id-usuario="${esc(u.id_usuario)}">
+                    <button type="button" class="btn btn-sm btn-light border text-danger px-2 py-1" data-bs-toggle="tooltip" title="Excluir" aria-label="Excluir estudante ${escAttr(u.nome_usuario)}" data-sgi-action="delete-student" data-id-usuario="${esc(u.id_usuario)}">
                         <i class="bi bi-trash"></i>
                     </button>` : ''}
                     ${podeResetarSenha ? `
-                    <button type="button" class="btn btn-sm btn-light border text-warning-emphasis px-2 py-1" data-bs-toggle="tooltip" title="Resetar senha" aria-label="Resetar senha do aluno" data-sgi-action="reset-student-password" data-id-usuario="${esc(u.id_usuario)}">
+                    <button type="button" class="btn btn-sm btn-light border text-warning-emphasis px-2 py-1" data-bs-toggle="tooltip" title="Resetar senha" aria-label="Resetar senha do estudante" data-sgi-action="reset-student-password" data-id-usuario="${esc(u.id_usuario)}">
                         <i class="bi bi-key-fill"></i>
                     </button>` : ''}
                 </div>`;
@@ -264,12 +264,12 @@ window.SGIPage.mount("participantes/turma-alunos", function (pageConfig, pageSco
         }
 
         const rotulo = total
-            ? `Mostrando ${ini + 1}–${Math.min(ini + POR_PAGINA, total)} de ${total} aluno${total !== 1 ? 's' : ''}`
-            : 'Nenhum aluno encontrado';
+            ? `Mostrando ${ini + 1}–${Math.min(ini + POR_PAGINA, total)} de ${total} estudante${total !== 1 ? 's' : ''}`
+            : 'Nenhum estudante encontrado';
         document.getElementById('taInfoPaginaDesk').textContent = rotulo;
         document.getElementById('taInfoPaginaMob').textContent = rotulo;
-        document.getElementById('contadorAlunosDesk').textContent = `${total} aluno${total !== 1 ? 's' : ''}`;
-        document.getElementById('taTableCount').textContent = `${total} aluno${total !== 1 ? 's' : ''}`;
+        document.getElementById('contadorAlunosDesk').textContent = `${total} estudante${total !== 1 ? 's' : ''}`;
+        document.getElementById('taTableCount').textContent = `${total} estudante${total !== 1 ? 's' : ''}`;
 
         construirPaginacao('paginacaoDesk', total, totalPaginas);
         construirPaginacao('paginacaoMob', total, totalPaginas);
@@ -352,7 +352,7 @@ window.SGIPage.mount("participantes/turma-alunos", function (pageConfig, pageSco
         document.getElementById('alunoRm').value = aluno ? aluno.matricula_usuario : '';
         document.getElementById('alunoGenero').value = aluno ? (aluno.genero_usuario || 'MASC') : 'MASC';
         document.getElementById('alunoDataNasc').value = aluno && aluno.data_nasc_usuario ? aluno.data_nasc_usuario : '';
-        document.getElementById('modalAlunoTitulo').textContent = aluno ? 'Editar aluno' : 'Adicionar aluno';
+        document.getElementById('modalAlunoTitulo').textContent = aluno ? 'Editar estudante' : 'Adicionar estudante';
         document.getElementById('msgAluno').innerHTML = '';
         modal.show();
     }
@@ -389,7 +389,7 @@ window.SGIPage.mount("participantes/turma-alunos", function (pageConfig, pageSco
             if (js.status === 'sucesso') {
                 bootstrap.Modal.getInstance(document.getElementById('modalAluno')).hide();
                 if (js.senha_temporaria) {
-                    SGI.alert({ mensagem: `${js.mensagem || 'Aluno cadastrado.'}\nSenha temporária: ${js.senha_temporaria}`, tipo: 'success', restoreModal: false });
+                    SGI.alert({ mensagem: `${js.mensagem || 'Estudante cadastrado.'}\nSenha temporária: ${js.senha_temporaria}`, tipo: 'success', restoreModal: false });
                 }
                 carregarAlunos();
             } else {
